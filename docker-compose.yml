@@ -1,0 +1,84 @@
+version: "3.8"
+
+services:
+  # ─── Infrastructure ────────────────────────────────────────
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  # ─── Microservices ────────────────────────────────────────
+  auth-service:
+    build: ./auth-service
+    ports:
+      - "3001:3001"
+    environment:
+      MONGODB_URL: ${AUTH_MONGODB_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      PORT: 3001
+    depends_on:
+      - rabbitmq
+
+  incident-service:
+    build: ./incident-service
+    ports:
+      - "3002:3002"
+    environment:
+      MONGODB_URL: ${INCIDENT_MONGODB_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      RABBITMQ_URL: ${RABBITMQ_URL}
+      PORT: 3002
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  dispatch-service:
+    build: ./dispatch-service
+    ports:
+      - "3003:3003"
+    environment:
+      MONGODB_URL: ${DISPATCH_MONGODB_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      RABBITMQ_URL: ${RABBITMQ_URL}
+      PORT: 3003
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  analytics-service:
+    build: ./analytics-service
+    ports:
+      - "3004:3004"
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      INCIDENT_SERVICE_URL: http://incident-service:3002
+      DISPATCH_SERVICE_URL: http://dispatch-service:3003
+      PORT: 3004
+    depends_on:
+      - incident-service
+      - dispatch-service
+
+  client:
+    build: ./client
+    ports:
+      - "3005:80"
+    depends_on:
+      - auth-service
+      - incident-service
+      - dispatch-service
+      - analytics-service
+
