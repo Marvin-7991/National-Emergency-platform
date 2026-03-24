@@ -1,0 +1,3026 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Ghana Emergency Response Platform</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  
+  /* Maps */
+  #map { height: 100%; min-height: 420px; border-radius: 0.75rem; }
+  #tracking-map { height: calc(100vh - 250px); min-height: 480px; border-radius: 0.75rem; }
+  #map-picker { height: 400px; border-radius: 0.5rem; }
+  
+  /* Tab system */
+  .tab-content { display: none; opacity: 0; transition: opacity 0.2s; }
+  .tab-content.active { opacity: 1; }
+  
+  /* Status badges */
+  .status-badge { 
+    padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; 
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .status-created { background: linear-gradient(135deg, #fef3c7, #fcd34d); color: #78350f; }
+  .status-dispatched { background: linear-gradient(135deg, #dbeafe, #93c5fd); color: #1e40af; }
+  .status-in_progress { background: linear-gradient(135deg, #d1fae5, #6ee7b7); color: #065f46; }
+  .status-resolved { background: linear-gradient(135deg, #d1d5db, #9ca3af); color: #1f2937; }
+
+  /* Role badges */
+  .role-badge {
+    padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
+    background: rgba(59, 130, 246, 0.1); color: #1e40af;
+  }
+
+  /* Location search dropdown */
+  .loc-search-wrap { position: relative; }
+  .loc-results {
+    position: absolute; top: 100%; left: 0; right: 0; z-index: 9999;
+    background: #fff; border: 1px solid #e5e7eb; border-radius: 8px;
+    max-height: 240px; overflow-y: auto;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+  }
+  .loc-result-item {
+    padding: 10px 14px; cursor: pointer; font-size: 13px;
+    border-bottom: 1px solid #f3f4f6; color: #374151; line-height: 1.4; transition: 0.15s;
+  }
+  .loc-result-item:last-child { border-bottom: none; }
+  .loc-result-item:hover { background: #fef2f2; color: #dc2626; padding-left: 18px; }
+
+  /* Location display pill */
+  .loc-pill {
+    background: linear-gradient(135deg, #eff6ff, #dbeafe); border: 1px solid #93c5fd; 
+    border-radius: 8px; padding: 8px 12px; font-size: 12px; color: #1e40af;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500;
+  }
+
+  /* Pick-on-map button */
+  .pick-btn {
+    width: 100%; border: 2px dashed #cbd5e1; border-radius: 8px;
+    padding: 12px 16px; font-size: 13px; color: #64748b;
+    text-align: left; background: #f8fafc; transition: all 0.2s; cursor: pointer; font-weight: 500;
+  }
+  .pick-btn:hover { 
+    border-color: #ef4444; color: #dc2626; background: #fff5f5; 
+    transform: translateY(-1px);
+  }
+
+  /* Map picker modal overlay */
+  #map-picker-modal {
+    position: fixed; inset: 0; z-index: 50;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+  }
+  #map-picker-modal.hidden { display: none; }
+
+  /* Delete confirmation modal overlay */
+  #delete-confirmation-modal {
+    position: fixed; inset: 0; z-index: 60;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+  }
+  #delete-confirmation-modal.hidden { display: none; }
+
+  /* Responsive grid helpers */
+  @media (max-width: 640px) {
+    #map { height: 300px; }
+    #tracking-map { height: 350px; }
+  }
+
+  /* Animations */
+  @keyframes slideIn {
+    from { transform: translateX(-20px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+  @keyframes incidentPulse {
+    0%, 100% { transform: scale(1);    opacity: 1; }
+    50%       { transform: scale(1.25); opacity: 0.75; }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  .animate-slideIn { animation: slideIn 0.3s ease-out; }
+  .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
+
+  /* Vehicle highlight rings — expand outward and fade */
+  @keyframes vehicleRingPulse {
+    0%   { transform: scale(0.7); opacity: 0.9; }
+    100% { transform: scale(2.2); opacity: 0; }
+  }
+  /* Incident beacon — concentric expanding rings */
+  @keyframes incidentBeaconPulse {
+    0%   { transform: scale(0.6); opacity: 0.85; }
+    100% { transform: scale(2.0); opacity: 0; }
+  }
+  /* Dispatch panel pulse border */
+  @keyframes dispatchBorderPulse {
+    0%, 100% { border-color: #fca5a5; }
+    50%       { border-color: #dc2626; }
+  }
+  #dispatch-progress-panel { animation: dispatchBorderPulse 2s ease-in-out infinite; }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: #f1f5f9; }
+  ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+  /* Utility classes */
+  .card { @apply bg-white rounded-lg shadow-sm border border-gray-100 p-6; }
+  .card-hover { @apply hover:shadow-md transition-shadow cursor-pointer; }
+</style>
+</head>
+<body class="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
+
+<!-- ── Login Screen ──────────────────────────────────────── -->
+<div id="login-screen" class="flex items-center justify-center min-h-screen px-4">
+  <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md border border-gray-100">
+    <div class="text-center mb-8">
+      <div class="text-5xl mb-4 animate-bounce">🚨</div>
+      <h1 class="text-3xl font-bold bg-gradient-to-r from-red-600 to-red-800 bg-clip-text text-transparent">
+        Ghana Emergency Platform
+      </h1>
+      <p class="text-gray-600 text-sm mt-2">National Response & Dispatch System</p>
+      <p class="text-gray-400 text-xs mt-1">CPEN 421 - Final Project</p>
+    </div>
+    <div id="login-error" class="hidden bg-red-50 text-red-700 p-4 rounded-lg mb-4 text-sm border border-red-200"></div>
+    <div class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+        <input id="login-email" type="email" placeholder="admin@emergency.gov.gh"
+          class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition"/>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+        <input id="login-password" type="password" placeholder="••••••••"
+          class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition"/>
+      </div>
+      <button onclick="login()"
+        class="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-bold py-3 rounded-lg transition transform hover:scale-105">
+        🔐 Sign In
+      </button>
+    </div>
+    <p class="text-center text-sm text-gray-600 mt-5">
+      No account?
+      <span class="text-red-600 cursor-pointer hover:underline font-semibold" onclick="showRegister()">Register as Admin</span>
+    </p>
+    <div class="mt-6 pt-6 border-t border-gray-200">
+      <p class="text-xs font-semibold text-gray-500 text-center mb-2">Demo Credentials (password: <span class="font-bold text-red-600">admin123</span>)</p>
+      <div class="space-y-1 text-xs text-gray-500">
+        <div class="flex justify-between bg-gray-50 rounded px-3 py-1.5 cursor-pointer hover:bg-red-50" onclick="document.getElementById('login-email').value='admin@emergency.gh';document.getElementById('login-password').value='admin123'">
+          <span>System Admin</span><span class="text-blue-600 font-medium">admin@emergency.gh</span>
+        </div>
+        <div class="flex justify-between bg-gray-50 rounded px-3 py-1.5 cursor-pointer hover:bg-red-50" onclick="document.getElementById('login-email').value='hospital@emergency.gh';document.getElementById('login-password').value='admin123'">
+          <span>Hospital Admin</span><span class="text-blue-600 font-medium">hospital@emergency.gh</span>
+        </div>
+        <div class="flex justify-between bg-gray-50 rounded px-3 py-1.5 cursor-pointer hover:bg-red-50" onclick="document.getElementById('login-email').value='police@emergency.gh';document.getElementById('login-password').value='admin123'">
+          <span>Police Admin</span><span class="text-blue-600 font-medium">police@emergency.gh</span>
+        </div>
+        <div class="flex justify-between bg-gray-50 rounded px-3 py-1.5 cursor-pointer hover:bg-red-50" onclick="document.getElementById('login-email').value='fire@emergency.gh';document.getElementById('login-password').value='admin123'">
+          <span>Fire Admin</span><span class="text-blue-600 font-medium">fire@emergency.gh</span>
+        </div>
+        <div class="flex justify-between bg-gray-50 rounded px-3 py-1.5 cursor-pointer hover:bg-red-50" onclick="document.getElementById('login-email').value='driver@emergency.gh';document.getElementById('login-password').value='admin123'">
+          <span>Ambulance Driver</span><span class="text-blue-600 font-medium">driver@emergency.gh</span>
+        </div>
+      </div>
+      <p class="text-xs text-gray-400 text-center mt-2">Click any row to auto-fill credentials</p>
+    </div>
+  </div>
+</div>
+
+<!-- ── Register Screen ───────────────────────────────────── -->
+<div id="register-screen" class="hidden flex items-center justify-center min-h-screen px-4 py-8">
+  <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md border border-gray-100">
+    <h1 class="text-2xl font-bold text-gray-800 mb-1">Create Account</h1>
+    <p class="text-gray-500 text-sm mb-6">Join the Ghana Emergency Platform</p>
+    <div id="register-error" class="hidden bg-red-50 text-red-700 p-4 rounded-lg mb-4 text-sm border border-red-200"></div>
+    <div class="space-y-3">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+        <input id="reg-name" type="text" placeholder="Your full name"
+          class="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition"/>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+        <input id="reg-email" type="email" placeholder="your@email.com"
+          class="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition"/>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+        <input id="reg-password" type="password" placeholder="••••••••"
+          class="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition"/>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
+        <select id="reg-role"
+          class="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition">
+          <option value="">Select Your Role...</option>
+          <option value="system_admin">🔐 System Administrator</option>
+          <option value="hospital_admin">🏥 Hospital Administrator</option>
+          <option value="police_admin">🚔 Police Administrator</option>
+          <option value="fire_admin">🚒 Fire Service Administrator</option>
+          <option value="ambulance_driver">🚑 Ambulance Driver</option>
+        </select>
+      </div>
+      <button onclick="register()"
+        class="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-bold py-2.5 rounded-lg transition transform hover:scale-105">
+        Create Account
+      </button>
+      <button onclick="showLogin()"
+        class="w-full border-2 border-gray-300 text-gray-700 font-semibold py-2.5 rounded-lg hover:bg-gray-50 transition">
+        ← Back to Login
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Shared Map Picker Modal ────────────────────────────── -->
+<div id="map-picker-modal" class="hidden">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mx-4 overflow-hidden border border-gray-200">
+    <!-- Header -->
+    <div class="flex items-center justify-between px-6 py-5 bg-gradient-to-r from-red-50 to-orange-50 border-b border-gray-200">
+      <div>
+        <h3 class="font-bold text-gray-800 text-lg">📍 Select Location</h3>
+        <p class="text-xs text-gray-500 mt-0.5">Search, click the map, or use GPS to set coordinates</p>
+      </div>
+      <button onclick="closeMapPicker()" class="text-gray-400 hover:text-gray-700 text-2xl leading-none">✕</button>
+    </div>
+    <!-- Search bar -->
+    <div class="px-6 pt-5 pb-2">
+      <div class="loc-search-wrap">
+        <div class="flex gap-2">
+          <input id="picker-search" type="text" placeholder="Search a location in Ghana (e.g., Osu, Korle-Bu Hospital)..."
+            class="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition"
+            oninput="debouncedPickerSearch(this.value)"
+            onkeydown="if(event.key==='Escape') document.getElementById('picker-results').classList.add('hidden')"/>
+          <button onclick="useGpsForPicker()" title="Use your current location"
+            class="flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-700 px-4 py-2.5 rounded-lg text-sm font-semibold transition whitespace-nowrap">
+            📍 My GPS
+          </button>
+        </div>
+        <div id="picker-results" class="loc-results hidden"></div>
+      </div>
+    </div>
+    <!-- Map -->
+    <div class="px-6 pb-2 mt-2">
+      <div id="map-picker" class="rounded-xl border border-gray-300 overflow-hidden shadow"></div>
+      <p class="text-xs text-gray-500 mt-2 text-center">Click anywhere on the map to place a pin</p>
+    </div>
+    <!-- Selected location display -->
+    <div id="picker-selected-display" class="hidden mx-6 my-3 loc-pill"><span id="picker-selected-text"></span></div>
+    <!-- Footer -->
+    <div class="flex gap-3 justify-end px-6 py-4 bg-gray-50 border-t border-gray-200">
+      <button onclick="closeMapPicker()"
+        class="px-5 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition">
+        Cancel
+      </button>
+      <button onclick="confirmPickerLocation()" id="picker-confirm-btn" disabled
+        class="px-5 py-2 bg-red-600 text-white rounded-lg text-sm font-bold hover:bg-red-700 transition disabled:opacity-40 disabled:cursor-not-allowed">
+        ✓ Confirm
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Delete Confirmation Modal ────────────────────────── -->
+<div id="delete-confirmation-modal" class="hidden" onclick="if(event.target.id === 'delete-confirmation-modal') cancelDelete()">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden border border-gray-200">
+    <!-- Header -->
+    <div class="flex items-center justify-between px-6 py-6 bg-gradient-to-r from-red-50 to-orange-50 border-b border-gray-200">
+      <div class="flex items-start gap-4">
+        <span class="text-4xl">⚠️</span>
+        <div>
+          <h3 class="font-bold text-gray-800 text-lg">Delete Incident?</h3>
+          <p id="confirm-incident-type" class="text-sm text-gray-600 mt-1">Medical Emergency</p>
+        </div>
+      </div>
+      <button onclick="cancelDelete()" class="text-gray-400 hover:text-gray-700 text-2xl leading-none">✕</button>
+    </div>
+    <!-- Content -->
+    <div class="px-6 py-5">
+      <p class="text-gray-700 text-sm mb-4">This action <strong>cannot be undone</strong>. The incident will be permanently deleted from the system.</p>
+      <div class="bg-red-50 border border-red-200 rounded-lg p-3">
+        <p class="text-xs text-red-800"><strong>⚠️ Warning:</strong> All associated responder and hospital assignments will be freed.</p>
+      </div>
+    </div>
+    <!-- Footer with Buttons -->
+    <div class="flex gap-3 justify-end px-6 py-4 bg-gray-50 border-t border-gray-200">
+      <button onclick="cancelDelete()"
+        class="px-6 py-2.5 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-100 transition">
+        Cancel
+      </button>
+      <button onclick="confirmDelete()"
+        class="px-6 py-2.5 bg-red-600 text-white rounded-lg text-sm font-bold hover:bg-red-700 transition">
+        Delete Incident
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Main App ───────────────────────────────────────────── -->
+<div id="app" class="hidden min-h-screen flex flex-col lg:flex-row">
+  <!-- Sidebar Navigation (Desktop) -->
+  <aside id="sidebar" class="hidden lg:flex flex-col w-64 bg-gradient-to-b from-gray-900 to-gray-800 text-white shadow-xl fixed h-screen overflow-y-auto">
+    <div class="p-6 border-b border-gray-700">
+      <div class="flex items-center gap-3">
+        <span class="text-3xl">🚨</span>
+        <div>
+          <h1 class="font-bold text-sm">Ghana Emergency</h1>
+          <p class="text-xs text-gray-400">Platform</p>
+        </div>
+      </div>
+    </div>
+    <nav class="flex-1 p-4 overflow-y-auto space-y-2">
+      <button onclick="showTab('incidents-tab', this); loadIncidents()" class="sidebar-nav-btn w-full text-left" data-role="system_admin,hospital_admin,police_admin,fire_admin,ambulance_driver">
+        <span class="text-lg mr-3">📋</span>Incidents
+      </button>
+      <button onclick="showTab('report-tab', this); initReportMap()" class="sidebar-nav-btn w-full text-left" data-role="system_admin">
+        <span class="text-lg mr-3">➕</span>Report Incident
+      </button>
+      <button onclick="showTab('tracking-tab', this); initTrackingMap()" class="sidebar-nav-btn w-full text-left" data-role="system_admin,hospital_admin,police_admin,fire_admin,ambulance_driver">
+        <span class="text-lg mr-3">🗺️</span>Live Tracking
+      </button>
+      <button onclick="showTab('analytics-tab', this); loadAnalytics()" class="sidebar-nav-btn w-full text-left" data-role="system_admin,hospital_admin,police_admin,fire_admin">
+        <span class="text-lg mr-3">📊</span>Analytics
+      </button>
+      <button onclick="showTab('manage-tab', this); loadManageTab()" class="sidebar-nav-btn w-full text-left" data-role="system_admin,hospital_admin,police_admin,fire_admin,ambulance_driver">
+        <span class="text-lg mr-3">⚙️</span>Management
+      </button>
+    </nav>
+    <div class="p-4 border-t border-gray-700 space-y-2">
+      <div id="sidebar-user" class="text-sm px-3 py-2 bg-gray-700 rounded-lg">
+        <p class="font-semibold text-white"></p>
+        <p class="text-xs text-gray-400"></p>
+      </div>
+      <button onclick="logout()" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2 rounded-lg transition text-sm">
+        🚪 Logout
+      </button>
+    </div>
+  </aside>
+
+  <!-- Mobile Header/Nav -->
+  <nav class="lg:hidden bg-gradient-to-r from-red-700 via-red-600 to-red-800 text-white px-4 py-4 shadow-lg sticky top-0 z-40">
+    <div class="flex justify-between items-center mb-3">
+      <div class="flex items-center gap-2">
+        <span class="text-2xl">🚨</span>
+        <span class="font-bold text-sm">Ghana Emergency Platform</span>
+      </div>
+      <button onclick="toggleMobileMenu()" class="text-2xl">☰</button>
+    </div>
+    <div id="mobile-nav" class="hidden space-y-1 text-sm">
+      <button onclick="showTab('incidents-tab', event.target); loadIncidents(); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded hover:bg-red-600">📋 Incidents</button>
+      <button onclick="showTab('report-tab', event.target); initReportMap(); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded hover:bg-red-600" data-role="system_admin">➕ Report Incident</button>
+      <button onclick="showTab('tracking-tab', event.target); initTrackingMap(); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded hover:bg-red-600">🗺️ Live Tracking</button>
+      <button onclick="showTab('analytics-tab', event.target); loadAnalytics(); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded hover:bg-red-600">📊 Analytics</button>
+      <button onclick="showTab('manage-tab', event.target); loadManageTab(); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded hover:bg-red-600">⚙️ Management</button>
+    </div>
+    <div class="flex items-center justify-between text-xs">
+      <div id="mobile-user">
+        <p><strong></strong></p>
+        <p class="text-red-200"></p>
+      </div>
+      <button onclick="logout()" class="bg-red-900 hover:bg-red-800 px-3 py-1 rounded text-sm">Logout</button>
+    </div>
+  </nav>
+
+  <!-- Main Content Area -->
+  <main class="flex-1 lg:ml-64 w-full">
+    <!-- Desktop User Info Bar -->
+    <div id="desktop-header" class="hidden lg:block bg-white border-b border-gray-200 px-8 py-4 flex justify-between items-center">
+      <div>
+        <h2 class="text-2xl font-bold text-gray-800">Emergency Response Dashboard</h2>
+        <p id="current-time" class="text-sm text-gray-500 mt-1"></p>
+      </div>
+      <div id="desktop-user" class="text-right">
+        <p class="font-semibold text-gray-800"></p>
+        <p id="desktop-role" class="text-sm text-gray-600"></p>
+      </div>
+    </div>
+
+    <!-- Content Tabs -->
+    <div class="p-4 lg:p-8 space-y-6">
+
+      <!-- ── TAB 1: Incidents List ──────────────────────────────── -->
+      <div id="incidents-tab" class="tab-content active" style="display:block">
+        <div class="mb-6">
+          <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+            <div>
+              <h2 class="text-3xl font-bold text-gray-800">Incident Log</h2>
+              <p class="text-gray-500 text-sm mt-1">All emergencies — active and resolved — are logged here</p>
+            </div>
+            <button onclick="loadIncidents()"
+              class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded-lg transition text-sm">
+              🔄 Refresh
+            </button>
+          </div>
+          <!-- Summary cards -->
+          <div id="incident-stats" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="card text-center">
+              <p class="text-3xl font-bold text-red-600">0</p>
+              <p class="text-gray-600 text-sm mt-1">Total Active</p>
+            </div>
+            <div class="card text-center">
+              <p class="text-3xl font-bold text-blue-600">0</p>
+              <p class="text-gray-600 text-sm mt-1">Dispatched</p>
+            </div>
+            <div class="card text-center">
+              <p class="text-3xl font-bold text-green-600">0</p>
+              <p class="text-gray-600 text-sm mt-1">In Progress</p>
+            </div>
+            <div class="card text-center">
+              <p class="text-3xl font-bold text-gray-600">0</p>
+              <p class="text-gray-600 text-sm mt-1">Today Resolved</p>
+            </div>
+          </div>
+        </div>
+        <div id="incidents-list" class="space-y-4">
+          <div class="text-center py-12 text-gray-400">Loading incidents...</div>
+        </div>
+      </div>
+
+      <!-- ── TAB 2: Report Incident ─────────────────────────────── -->
+      <div id="report-tab" class="tab-content" style="display:none;flex-direction:column;height:calc(100vh - 130px)">
+
+        <!-- Compact header -->
+        <div class="mb-3 flex-shrink-0 flex items-center justify-between">
+          <div>
+            <h2 class="text-2xl font-bold text-gray-800">📋 Report New Incident</h2>
+            <p class="text-gray-500 text-xs mt-0.5">Log an emergency — system will auto-dispatch the nearest unit</p>
+          </div>
+        </div>
+
+        <!-- Alerts -->
+        <div id="report-error" class="hidden bg-red-50 text-red-700 px-4 py-2 rounded-lg mb-2 text-sm border border-red-200 flex items-center gap-2 flex-shrink-0">
+          <span>⚠️</span><span id="report-error-text"></span>
+        </div>
+        <div id="report-success" class="hidden bg-green-50 text-green-700 px-4 py-2 rounded-lg mb-2 text-sm border border-green-200 flex items-center gap-2 flex-shrink-0">
+          <span>✅</span><span id="report-success-text"></span>
+        </div>
+
+        <!-- Two-column: map left, form right -->
+        <div class="flex gap-4 flex-1 min-h-0">
+
+          <!-- LEFT: Full-screen map -->
+          <div class="flex-1 relative flex flex-col min-h-0 rounded-xl overflow-hidden border border-gray-300 shadow-lg">
+            <!-- Search bar floating over map -->
+            <div class="absolute top-3 left-3 right-3 z-[1000] loc-search-wrap">
+              <div class="flex gap-2">
+                <input id="inc-search" type="text" placeholder="🔍 Search for a location in Ghana..."
+                  class="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 bg-white shadow-md"
+                  oninput="debouncedIncSearch(this.value)"
+                  onkeydown="if(event.key==='Escape') document.getElementById('inc-search-results').classList.add('hidden')"/>
+                <button onclick="useGpsForIncident()"
+                  class="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-sm font-semibold shadow-md whitespace-nowrap transition">
+                  📍 GPS
+                </button>
+              </div>
+              <div id="inc-search-results" class="loc-results hidden"></div>
+            </div>
+            <!-- Map fills the container -->
+            <div id="map" class="flex-1"></div>
+            <!-- Location pill floating at bottom -->
+            <div id="inc-location-pill" class="hidden absolute bottom-3 left-3 right-3 z-[1000] loc-pill shadow-md"></div>
+            <!-- Click hint -->
+            <div class="absolute bottom-14 left-1/2 -translate-x-1/2 z-[1000] bg-black/50 text-white text-xs px-3 py-1.5 rounded-full pointer-events-none" id="map-hint">
+              👆 Click anywhere on the map to drop an incident pin
+            </div>
+          </div>
+
+          <!-- RIGHT: Compact form panel -->
+          <div class="w-80 xl:w-96 flex-shrink-0 bg-white rounded-xl shadow-lg overflow-y-auto">
+            <div class="p-5 space-y-4">
+
+              <!-- Citizen Info -->
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1.5">👤 Citizen Name <span class="text-red-500">*</span></label>
+                <input id="citizen-name" type="text" placeholder="Full name of caller..."
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 transition" required/>
+              </div>
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1.5">📞 Contact Number</label>
+                <input id="citizen-phone" type="tel" placeholder="+233 2XX XXX XXXX"
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 transition"/>
+              </div>
+
+              <div class="border-t pt-4">
+                <label class="block text-sm font-semibold text-gray-700 mb-1.5">🚨 Incident Type <span class="text-red-500">*</span></label>
+                <select id="incident-type"
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 transition" required>
+                  <option value="">Select incident type...</option>
+                  <option value="Medical Emergency">🏥 Medical Emergency</option>
+                  <option value="Fire Outbreak">🔥 Fire Outbreak</option>
+                  <option value="Robbery">💰 Robbery</option>
+                  <option value="Road Accident">🚗 Road Accident</option>
+                  <option value="Crime">🔓 Crime</option>
+                  <option value="Explosion">💥 Explosion</option>
+                  <option value="Flood">🌊 Flood</option>
+                  <option value="Injury">🩹 Injury</option>
+                  <option value="Other">📌 Other</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1.5">🔍 Severity Level</label>
+                <select id="incident-severity"
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 transition">
+                  <option value="low">🟢 Low Priority</option>
+                  <option value="medium">🟡 Medium Priority</option>
+                  <option value="high" selected>🔴 High Priority</option>
+                  <option value="critical">⚫ Critical</option>
+                </select>
+              </div>
+
+              <!-- Coordinates (read-only, updated by map click) -->
+              <div class="border-t pt-4">
+                <label class="block text-xs font-semibold text-gray-500 mb-2">📍 Selected Coordinates</label>
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="text-xs text-gray-400 mb-1 block">Latitude</label>
+                    <input id="inc-lat" type="text" placeholder="—" readonly
+                      class="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-xs text-gray-700 font-mono"/>
+                  </div>
+                  <div>
+                    <label class="text-xs text-gray-400 mb-1 block">Longitude</label>
+                    <input id="inc-lon" type="text" placeholder="—" readonly
+                      class="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-xs text-gray-700 font-mono"/>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Notes -->
+              <div class="border-t pt-4">
+                <label class="block text-sm font-semibold text-gray-700 mb-1.5">📝 Incident Notes</label>
+                <textarea id="incident-notes" rows="4"
+                  placeholder="Describe the situation (injuries, hazards, people involved)..."
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 transition resize-none"></textarea>
+              </div>
+
+              <!-- Submit -->
+              <button onclick="submitIncident()"
+                class="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-bold py-3.5 rounded-lg transition transform hover:scale-105 text-sm shadow-md">
+                🚨 Submit Incident & Dispatch Responder
+              </button>
+
+              <!-- Dispatch info panel (shown after submit) -->
+              <div id="dispatch-info" class="hidden bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800 space-y-1">
+                <p class="font-bold text-sm">🚒 Dispatch Details</p>
+                <p id="dispatch-unit"></p>
+                <p id="dispatch-eta"></p>
+                <div class="mt-2 pt-2 border-t border-blue-200">
+                  <p class="text-blue-600 text-xs font-semibold mb-1">Status Timeline:</p>
+                  <div id="dispatch-timeline" class="space-y-1"></div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── TAB 3: Live Tracking ───────────────────────────────── -->
+      <div id="tracking-tab" class="tab-content">
+        <!-- Header -->
+        <div class="mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <div>
+            <h2 class="text-3xl font-bold text-gray-800">🗺️ Live Vehicle Tracking</h2>
+            <p class="text-gray-500 text-sm mt-1">Real-time animated GPS tracking of all emergency units</p>
+          </div>
+          <div class="flex items-center gap-3">
+            <label class="flex items-center gap-2 text-sm cursor-pointer select-none bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-sm">
+              <input type="checkbox" id="trail-toggle" onchange="toggleTrails()" class="accent-red-600"/>
+              <span class="text-gray-700 font-medium">Route Trails</span>
+            </label>
+            <div class="flex items-center gap-2 bg-white rounded-lg px-4 py-2 shadow-sm border border-gray-200">
+              <span id="ws-status" class="w-3 h-3 rounded-full bg-gray-300 inline-block"></span>
+              <span id="ws-label" class="text-sm font-semibold text-gray-600">Connecting...</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
+          <!-- Map + log: 3/4 -->
+          <div class="lg:col-span-3 space-y-4">
+            <div id="tracking-map" class="rounded-xl border border-gray-300 shadow-lg overflow-hidden"></div>
+
+            <!-- GPS Update Log -->
+            <div class="card">
+              <div class="flex justify-between items-center mb-2">
+                <h3 class="font-bold text-gray-800 text-sm">📡 Live GPS Update Log</h3>
+                <button onclick="clearSimLog()" class="text-xs text-gray-400 hover:text-red-500 transition">🗑 Clear</button>
+              </div>
+              <div id="sim-log" class="max-h-28 overflow-y-auto space-y-px">
+                <p class="text-gray-400 text-xs text-center py-3">No GPS updates yet — start simulation or wait for live updates</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right panel: 1/4 -->
+          <div class="space-y-4">
+            <!-- Active Dispatch Panel — shown only during active response -->
+            <div id="dispatch-progress-panel" class="hidden bg-red-50 border-2 border-red-300 rounded-xl p-3 shadow-md">
+              <!-- injected by JS -->
+            </div>
+
+            <!-- Active Units -->
+            <div class="card">
+              <div class="flex justify-between items-center mb-3">
+                <h3 class="font-bold text-gray-800 text-sm">🚨 Active Units</h3>
+                <button onclick="fitAllVehicles()" title="Zoom to fit all vehicles" class="text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded transition">🔍 Fit</button>
+              </div>
+              <div id="vehicle-list" class="space-y-2 max-h-56 overflow-y-auto">
+                <p class="text-gray-400 text-xs text-center py-3">No vehicles registered yet</p>
+              </div>
+              <button onclick="loadVehicles()" class="w-full mt-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-xs py-1.5 rounded-lg transition">🔄 Refresh</button>
+            </div>
+
+            <!-- Simulation Controls -->
+            <div class="card">
+              <h3 class="font-bold text-gray-800 mb-3">🎮 Simulation</h3>
+
+              <div class="space-y-3">
+                <div>
+                  <label class="block text-xs font-semibold text-gray-600 mb-1">Vehicle</label>
+                  <select id="sim-vehicle" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+                    <option value="">— All vehicles —</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label class="block text-xs font-semibold text-gray-600 mb-1">Update Interval</label>
+                  <select id="sim-speed" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+                    <option value="300" selected>🚀 Turbo (0.3s)</option>
+                    <option value="500">⚡ Fast (0.5s)</option>
+                    <option value="1200">🚗 Normal (1.2s)</option>
+                    <option value="2500">🐢 Slow (2.5s)</option>
+                  </select>
+                </div>
+
+                <!-- Auto-simulate toggle -->
+                <button id="auto-sim-btn" onclick="toggleAutoSim()"
+                  class="w-full bg-green-600 hover:bg-green-700 text-white font-bold text-sm py-2.5 rounded-lg transition">
+                  ▶ Start Auto-Simulate
+                </button>
+
+                <!-- Single step -->
+                <button onclick="simulateGPS()"
+                  class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm py-2 rounded-lg transition">
+                  📍 Single Step
+                </button>
+              </div>
+
+              <!-- Stats -->
+              <div class="mt-3 pt-3 border-t border-gray-100 space-y-1">
+                <div class="flex justify-between text-xs">
+                  <span class="text-gray-500">Status</span>
+                  <span id="auto-sim-status" class="font-bold text-gray-500">Idle</span>
+                </div>
+                <div class="flex justify-between text-xs">
+                  <span class="text-gray-500">Updates sent</span>
+                  <span id="sim-count" class="font-bold text-blue-600">0</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── TAB 4: Management ──────────────────────────────────── -->
+      <div id="manage-tab" class="tab-content">
+        <div class="mb-6">
+          <h2 class="text-3xl font-bold text-gray-800">⚙️ Management Dashboard</h2>
+          <p class="text-gray-500 text-sm mt-1">Manage hospitals, responders, and vehicles</p>
+        </div>
+        <div id="manage-content" class="space-y-6">
+
+          <!-- Hospital management -->
+          <div id="hospitals-panel" data-role="system_admin,hospital_admin" class="card">
+            <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">🏥 Hospital Capacity Management</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Hospital Name</label>
+                <input id="new-hospital-name" type="text" placeholder="e.g., Korle-Bu Teaching Hospital"
+                  class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition"/>
+              </div>
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Total Beds</label>
+                <input id="new-hospital-beds" type="number" min="0" placeholder="e.g., 200"
+                  class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition"/>
+              </div>
+              <div class="md:col-span-2">
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Location</label>
+                <button type="button" class="pick-btn"
+                  onclick="openMapPicker('new-hospital-lat','new-hospital-lon','hospital-loc-pill')">
+                  📍 Click to pick hospital location on map
+                </button>
+                <div id="hospital-loc-pill" class="hidden loc-pill mt-2"></div>
+                <input id="new-hospital-lat" type="hidden"/>
+                <input id="new-hospital-lon" type="hidden"/>
+              </div>
+            </div>
+            <div class="flex gap-3 mb-5">
+              <button onclick="createHospital()"
+                class="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-2.5 rounded-lg transition">
+                ➕ Add Hospital
+              </button>
+              <button onclick="loadHospitals()"
+                class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-6 py-2.5 rounded-lg transition">
+                🔄 Refresh
+              </button>
+            </div>
+            <div id="hospitals-list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <p class="text-gray-400 text-sm">Loading hospitals...</p>
+            </div>
+          </div>
+
+          <!-- Responder management -->
+          <div id="responders-panel" data-role="system_admin,police_admin,fire_admin" class="card">
+            <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">🚔 Responder Stations</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Unit Name</label>
+                <input id="new-responder-name" type="text" placeholder="e.g., Accra Central Police Station"
+                  class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition"/>
+              </div>
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Responder Type</label>
+                <select id="new-responder-type"
+                  class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition">
+                  <option value="police">🚔 Police</option>
+                  <option value="fire">🚒 Fire Service</option>
+                  <option value="ambulance">🚑 Ambulance</option>
+                </select>
+              </div>
+              <div class="md:col-span-2">
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Station Location</label>
+                <button type="button" class="pick-btn"
+                  onclick="openMapPicker('new-responder-lat','new-responder-lon','responder-loc-pill')">
+                  📍 Click to pick station location on map
+                </button>
+                <div id="responder-loc-pill" class="hidden loc-pill mt-2"></div>
+                <input id="new-responder-lat" type="hidden"/>
+                <input id="new-responder-lon" type="hidden"/>
+              </div>
+            </div>
+            <div class="flex gap-3 mb-5">
+              <button onclick="addResponder()"
+                class="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-2.5 rounded-lg transition">
+                ➕ Add Responder
+              </button>
+              <button onclick="loadResponders()"
+                class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-6 py-2.5 rounded-lg transition">
+                🔄 Refresh
+              </button>
+            </div>
+            <div id="responders-list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <p class="text-gray-400 text-sm">Loading responders...</p>
+            </div>
+          </div>
+
+          <!-- Vehicle & Unit Registration (admin + drivers) -->
+          <div id="driver-panel" data-role="system_admin,ambulance_driver,police_admin,fire_admin" class="card">
+            <h3 class="text-xl font-bold text-gray-800 mb-1 flex items-center gap-2">🚗 Register Emergency Vehicle / Unit</h3>
+            <p class="text-gray-500 text-sm mb-4">Add vehicles in any region — especially less-endowed areas that need coverage</p>
+
+            <!-- Region quick-jump -->
+            <div class="mb-4">
+              <p class="text-xs font-semibold text-gray-500 mb-2">Quick jump to region (sets map view):</p>
+              <div class="flex flex-wrap gap-2">
+                <button onclick="jumpToRegion(7.3349,-2.3266,'Bono')" class="text-xs bg-gray-100 hover:bg-blue-100 border border-gray-300 rounded px-2 py-1 transition">Bono</button>
+                <button onclick="jumpToRegion(7.5905,-1.9380,'Bono East')" class="text-xs bg-gray-100 hover:bg-blue-100 border border-gray-300 rounded px-2 py-1 transition">Bono East</button>
+                <button onclick="jumpToRegion(6.8060,-2.5160,'Ahafo')" class="text-xs bg-gray-100 hover:bg-blue-100 border border-gray-300 rounded px-2 py-1 transition">Ahafo</button>
+                <button onclick="jumpToRegion(5.1053,-1.2466,'Central')" class="text-xs bg-gray-100 hover:bg-blue-100 border border-gray-300 rounded px-2 py-1 transition">Central</button>
+                <button onclick="jumpToRegion(6.0940,-0.2570,'Eastern')" class="text-xs bg-gray-100 hover:bg-blue-100 border border-gray-300 rounded px-2 py-1 transition">Eastern</button>
+                <button onclick="jumpToRegion(5.6037,-0.1870,'Greater Accra')" class="text-xs bg-gray-100 hover:bg-blue-100 border border-gray-300 rounded px-2 py-1 transition">Greater Accra</button>
+                <button onclick="jumpToRegion(6.6885,-1.6244,'Ashanti')" class="text-xs bg-gray-100 hover:bg-blue-100 border border-gray-300 rounded px-2 py-1 transition">Ashanti</button>
+                <button onclick="jumpToRegion(9.4034,-0.8424,'Northern')" class="text-xs bg-red-50 hover:bg-red-100 border border-red-300 rounded px-2 py-1 transition font-semibold text-red-700">Northern ⚠</button>
+                <button onclick="jumpToRegion(9.0840,-1.8220,'Savannah')" class="text-xs bg-red-50 hover:bg-red-100 border border-red-300 rounded px-2 py-1 transition font-semibold text-red-700">Savannah ⚠</button>
+                <button onclick="jumpToRegion(10.5200,-0.3640,'North East')" class="text-xs bg-red-50 hover:bg-red-100 border border-red-300 rounded px-2 py-1 transition font-semibold text-red-700">North East ⚠</button>
+                <button onclick="jumpToRegion(10.7854,-0.8514,'Upper East')" class="text-xs bg-red-50 hover:bg-red-100 border border-red-300 rounded px-2 py-1 transition font-semibold text-red-700">Upper East ⚠</button>
+                <button onclick="jumpToRegion(10.0601,-2.5099,'Upper West')" class="text-xs bg-red-50 hover:bg-red-100 border border-red-300 rounded px-2 py-1 transition font-semibold text-red-700">Upper West ⚠</button>
+                <button onclick="jumpToRegion(8.0730,0.1780,'Oti')" class="text-xs bg-red-50 hover:bg-red-100 border border-red-300 rounded px-2 py-1 transition font-semibold text-red-700">Oti ⚠</button>
+                <button onclick="jumpToRegion(6.6012,0.4700,'Volta')" class="text-xs bg-gray-100 hover:bg-blue-100 border border-gray-300 rounded px-2 py-1 transition">Volta</button>
+                <button onclick="jumpToRegion(4.8845,-1.7554,'Western')" class="text-xs bg-gray-100 hover:bg-blue-100 border border-gray-300 rounded px-2 py-1 transition">Western</button>
+                <button onclick="jumpToRegion(6.2080,-2.4860,'Western North')" class="text-xs bg-gray-100 hover:bg-blue-100 border border-gray-300 rounded px-2 py-1 transition">Western North</button>
+              </div>
+              <p class="text-xs text-red-600 mt-1">⚠ = under-served — prioritise adding units here</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <!-- Register vehicle -->
+              <div class="border border-gray-300 rounded-lg p-4">
+                <p class="text-sm font-bold text-gray-800 mb-4">🚗 Vehicle Registration</p>
+                <div class="space-y-3">
+                  <input id="vehicle-id" type="text" placeholder="Vehicle ID (e.g., TAM-AMB-03)"
+                    class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition"/>
+                  <input id="vehicle-name" type="text" placeholder="Vehicle name (e.g., Tamale Ambulance 3)"
+                    class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition"/>
+                  <select id="vehicle-type"
+                    class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition">
+                    <option value="ambulance">🚑 Ambulance</option>
+                    <option value="police">🚔 Police Vehicle</option>
+                    <option value="fire">🚒 Fire Truck</option>
+                  </select>
+                  <label class="block text-xs font-semibold text-gray-600">📍 Station Location — click map or use region buttons above</label>
+                  <button type="button" class="pick-btn text-sm"
+                    onclick="openMapPicker('vehicle-lat','vehicle-lon','vehicle-loc-pill')">
+                    Click to pick location on map (whole Ghana)
+                  </button>
+                  <div id="vehicle-loc-pill" class="hidden loc-pill text-xs"></div>
+                  <input id="vehicle-lat" type="hidden"/>
+                  <input id="vehicle-lon" type="hidden"/>
+                  <button onclick="registerVehicle()"
+                    class="w-full bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2.5 rounded-lg text-sm transition">
+                    + Register Vehicle
+                  </button>
+                </div>
+              </div>
+              <!-- Update location -->
+              <div class="border border-gray-300 rounded-lg p-4">
+                <p class="text-sm font-bold text-gray-800 mb-4">📍 Send Location Update</p>
+                <div class="space-y-3">
+                  <input id="update-vehicle-id" type="text" placeholder="Vehicle ID"
+                    class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition"/>
+                  <button type="button" class="pick-btn text-sm"
+                    onclick="openMapPicker('update-lat','update-lon','update-loc-pill')">
+                    Click to pick new location
+                  </button>
+                  <div id="update-loc-pill" class="hidden loc-pill text-xs"></div>
+                  <input id="update-lat" type="hidden"/>
+                  <input id="update-lon" type="hidden"/>
+                  <select id="update-status"
+                    class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition">
+                    <option value="idle">🟢 Idle (At Station)</option>
+                    <option value="dispatched">🟡 Dispatched</option>
+                    <option value="on_scene">🔴 On Scene</option>
+                    <option value="returning">🔵 Returning</option>
+                  </select>
+                  <button onclick="updateVehicleLocation()"
+                    class="w-full bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2.5 rounded-lg text-sm transition">
+                    📤 Send Location
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div id="driver-status" class="mt-4 text-sm text-gray-600 p-3 bg-gray-50 rounded"></div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ── TAB 5: Analytics ───────────────────────────────────── -->
+      <div id="analytics-tab" class="tab-content">
+        <div class="mb-6">
+          <h2 class="text-3xl font-bold text-gray-800">📊 Analytics & Insights</h2>
+          <p class="text-gray-500 text-sm mt-1">Real-time operational metrics and statistics</p>
+        </div>
+        <div id="analytics-content">
+          <div class="text-center py-12 text-gray-400">Loading analytics...</div>
+        </div>
+      </div>
+
+    </div><!-- /content area -->
+  </main>
+</div><!-- /app -->
+
+<style>
+  .sidebar-nav-btn {
+    @apply px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-all font-medium text-sm flex items-center gap-2;
+  }
+</style>
+
+<script>
+// ── Config ─────────────────────────────────────────────────
+const API = {
+  auth:     "http://localhost:3001",
+  incident: "http://localhost:3002",
+  dispatch: "http://localhost:3003",
+  analytics:"http://localhost:3004",
+};
+
+let token = localStorage.getItem("token");
+let user  = JSON.parse(localStorage.getItem("user") || "null");
+
+// ── Auto-refresh on 401 ────────────────────────────────────
+let _refreshing = false;
+async function apiFetch(url, opts = {}) {
+  opts.headers = opts.headers || {};
+  if (token) opts.headers["Authorization"] = `Bearer ${token}`;
+  let res = await fetch(url, opts);
+  if (res.status === 401 && !_refreshing) {
+    const refreshToken = localStorage.getItem("refresh_token");
+    if (refreshToken) {
+      _refreshing = true;
+      try {
+        const r = await fetch(`${API.auth}/auth/refresh-token`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refresh_token: refreshToken })
+        });
+        if (r.ok) {
+          const d = await r.json();
+          token = d.token;
+          localStorage.setItem("token", token);
+          if (d.refresh_token) localStorage.setItem("refresh_token", d.refresh_token);
+          opts.headers["Authorization"] = `Bearer ${token}`;
+          res = await fetch(url, opts); // retry original request
+        } else {
+          logout(); return res;
+        }
+      } catch { logout(); return res; }
+      finally { _refreshing = false; }
+    } else {
+      logout();
+    }
+  }
+  return res;
+}
+let incidentMap, trackingMap, incidentMarker;
+let trackingMarkers = {};
+let ws;
+
+// ── Init ───────────────────────────────────────────────────
+window.onload = () => {
+  if (token && user) showApp();
+  else showLogin();
+  // Update time every second on desktop
+  setInterval(() => {
+    const now = new Date().toLocaleString('en-US', {
+      weekday: 'short', month: 'short', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit'
+    });
+    const el = document.getElementById('current-time');
+    if (el) el.textContent = now;
+  }, 1000);
+};
+
+// ── Mobile Menu Toggle ──────────────────────────────────────
+function toggleMobileMenu() {
+  const menu = document.getElementById('mobile-nav');
+  if (menu) menu.classList.toggle('hidden');
+}
+
+// ── Auth helpers ───────────────────────────────────────────
+function showLogin() {
+  document.getElementById("login-screen").classList.remove("hidden");
+  document.getElementById("register-screen").classList.add("hidden");
+  document.getElementById("app").classList.add("hidden");
+}
+function showRegister() {
+  document.getElementById("login-screen").classList.add("hidden");
+  document.getElementById("register-screen").classList.remove("hidden");
+}
+function showApp() {
+  document.getElementById("login-screen").classList.add("hidden");
+  document.getElementById("register-screen").classList.add("hidden");
+  document.getElementById("app").classList.remove("hidden");
+  
+  // Update user info in desktop header
+  const dUser = document.getElementById("desktop-user");
+  if (dUser) {
+    dUser.innerHTML = `<p class="font-bold text-gray-900">${user.name}</p>
+      <p class="text-sm text-gray-600">${user.role.replace(/_/g, " ").toUpperCase()}</p>`;
+  }
+  
+  // Update user info in mobile header
+  const mUser = document.getElementById("mobile-user");
+  if (mUser) {
+    mUser.innerHTML = `<div>
+      <p><strong>${user.name.split(' ')[0]}</strong></p>
+      <p class="text-red-200 text-xs">${user.role.replace(/_/g, " ")}</p>
+    </div>`;
+  }
+  
+  // Update sidebar user info
+  const sUser = document.getElementById("sidebar-user");
+  if (sUser) {
+    sUser.innerHTML = `<p class="font-bold text-white">${user.name}</p>
+      <p class="text-xs text-gray-300">${user.role.replace(/_/g, " ")}</p>`;
+  }
+  
+  applyRoleVisibility();
+  loadIncidents();
+  initReportMap();
+  connectWebSocket();
+}
+
+function applyRoleVisibility() {
+  document.querySelectorAll("[data-role]").forEach(el => {
+    const isVisibleRole = el.dataset.role.split(",").includes(user?.role);
+    el.style.display = isVisibleRole ? "" : "none";
+  });
+}
+function logout() {
+  localStorage.removeItem("token");
+  localStorage.removeItem("refresh_token");
+  localStorage.removeItem("user");
+  token = null; user = null;
+  showLogin();
+}
+
+async function login() {
+  const email    = document.getElementById("login-email").value;
+  const password = document.getElementById("login-password").value;
+  const errEl    = document.getElementById("login-error");
+  try {
+    const res = await fetch(`${API.auth}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) { errEl.textContent = data.error; errEl.classList.remove("hidden"); return; }
+    token = data.token; user = data.user;
+    localStorage.setItem("token", token);
+    if (data.refresh_token) localStorage.setItem("refresh_token", data.refresh_token);
+    localStorage.setItem("user", JSON.stringify(user));
+    errEl.classList.add("hidden");
+    showApp();
+  } catch {
+    errEl.textContent = "Connection failed. Is the server running?";
+    errEl.classList.remove("hidden");
+  }
+}
+
+async function register() {
+  const body = {
+    name:     document.getElementById("reg-name").value,
+    email:    document.getElementById("reg-email").value,
+    password: document.getElementById("reg-password").value,
+    role:     document.getElementById("reg-role").value,
+  };
+  const errEl = document.getElementById("register-error");
+  try {
+    const res = await fetch(`${API.auth}/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) { errEl.textContent = data.error; errEl.classList.remove("hidden"); return; }
+    alert("Registered successfully! Please log in.");
+    showLogin();
+  } catch {
+    errEl.textContent = "Connection failed.";
+    errEl.classList.remove("hidden");
+  }
+}
+
+// ── Tabs ───────────────────────────────────────────────────
+function showTab(tabId, btn) {
+  document.querySelectorAll(".tab-content").forEach(el => {
+    el.classList.remove("active");
+    el.style.display = "none";
+  });
+  document.querySelectorAll(".tab-btn").forEach(b => {
+    b.classList.remove("border-b-2","border-red-600","text-red-600");
+    b.classList.add("text-gray-500");
+  });
+  const tab = document.getElementById(tabId);
+  tab.classList.add("active");
+  // Report tab needs flex layout; all others use block
+  tab.style.display = tabId === "report-tab" ? "flex" : "block";
+  if (btn) {
+    btn.classList.add("border-b-2","border-red-600","text-red-600");
+    btn.classList.remove("text-gray-500");
+  }
+  // Let Leaflet re-measure after layout settles
+  setTimeout(() => {
+    if (tabId === "report-tab" && typeof incidentMap !== "undefined" && incidentMap) incidentMap.invalidateSize();
+    if (tabId === "tracking-tab" && typeof trackingMap !== "undefined" && trackingMap) trackingMap.invalidateSize();
+  }, 80);
+}
+
+// ══════════════════════════════════════════════════════════
+//   INCIDENT REPORT MAP (inline, with search + GPS)
+// ══════════════════════════════════════════════════════════
+
+function initReportMap() {
+  if (incidentMap) { setTimeout(() => incidentMap.invalidateSize(), 80); return; }
+  incidentMap = L.map("map").setView([5.6037, -0.1870], 12);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "© OpenStreetMap"
+  }).addTo(incidentMap);
+
+  incidentMap.on("click", e => {
+    placeIncidentPin(e.latlng.lat, e.latlng.lng);
+    const hint = document.getElementById("map-hint");
+    if (hint) hint.style.display = "none";
+  });
+  setTimeout(() => incidentMap.invalidateSize(), 150);
+}
+
+function placeIncidentPin(lat, lng, label) {
+  document.getElementById("inc-lat").value = lat.toFixed(6);
+  document.getElementById("inc-lon").value = lng.toFixed(6);
+  if (incidentMarker) incidentMarker.remove();
+  incidentMarker = L.marker([lat, lng])
+    .addTo(incidentMap)
+    .bindPopup(label || "Incident location")
+    .openPopup();
+  incidentMap.setView([lat, lng], 15);
+
+  const pill = document.getElementById("inc-location-pill");
+  if (label) {
+    pill.textContent = "📍 " + label;
+    pill.classList.remove("hidden");
+  } else {
+    pill.textContent = `📍 ${lat.toFixed(6)}, ${lng.toFixed(6)} — loading address...`;
+    pill.classList.remove("hidden");
+    fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`)
+      .then(r => r.json())
+      .then(d => { pill.textContent = "📍 " + (d.display_name || `${lat.toFixed(6)}, ${lng.toFixed(6)}`); })
+      .catch(() => { pill.textContent = `📍 ${lat.toFixed(6)}, ${lng.toFixed(6)}`; });
+  }
+}
+
+// Incident search
+let incSearchTimer;
+function debouncedIncSearch(q) {
+  clearTimeout(incSearchTimer);
+  const el = document.getElementById("inc-search-results");
+  if (!q || q.length < 3) { el.classList.add("hidden"); return; }
+  incSearchTimer = setTimeout(() => runIncidentSearch(q), 400);
+}
+
+async function runIncidentSearch(q) {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q + ", Ghana")}&format=json&limit=5`
+    );
+    const results = await res.json();
+    const el = document.getElementById("inc-search-results");
+    if (!results.length) { el.classList.add("hidden"); return; }
+    el.innerHTML = results.map(r => `
+      <div class="loc-result-item"
+        onclick="selectIncidentSearchResult(${r.lat}, ${r.lon}, this.innerText)">${r.display_name}</div>
+    `).join("");
+    el.classList.remove("hidden");
+  } catch {}
+}
+
+function selectIncidentSearchResult(lat, lon, label) {
+  document.getElementById("inc-search-results").classList.add("hidden");
+  document.getElementById("inc-search").value = "";
+  placeIncidentPin(parseFloat(lat), parseFloat(lon), label);
+}
+
+function useGpsForIncident() {
+  if (!navigator.geolocation) return alert("Geolocation is not supported by your browser.");
+  navigator.geolocation.getCurrentPosition(
+    pos => placeIncidentPin(pos.coords.latitude, pos.coords.longitude),
+    () => alert("Could not get your location. Please click on the map instead.")
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+//   SHARED MAP PICKER MODAL
+// ══════════════════════════════════════════════════════════
+
+let pickerMap, pickerMarker;
+let pickerLatId, pickerLonId, pickerPillId;
+let pickerLat = null, pickerLon = null;
+let pickerSearchTimer;
+
+function openMapPicker(latId, lonId, pillId) {
+  pickerLatId = latId;
+  pickerLonId = lonId;
+  pickerPillId = pillId;
+  pickerLat = null;
+  pickerLon = null;
+
+  document.getElementById("map-picker-modal").classList.remove("hidden");
+  document.getElementById("picker-search").value = "";
+  document.getElementById("picker-results").classList.add("hidden");
+  document.getElementById("picker-selected-display").classList.add("hidden");
+  document.getElementById("picker-confirm-btn").disabled = true;
+
+  // Init picker map once — zoom out to show all of Ghana
+  if (!pickerMap) {
+    pickerMap = L.map("map-picker").setView([7.9465, -1.0232], 7);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "© OpenStreetMap"
+    }).addTo(pickerMap);
+    pickerMap.on("click", e => setPickerPin(e.latlng.lat, e.latlng.lng));
+  } else {
+    // If a region jump was queued, fly to it
+    if (window._pickerJumpView) {
+      pickerMap.setView(window._pickerJumpView.latlng, window._pickerJumpView.zoom);
+      window._pickerJumpView = null;
+    }
+  }
+
+  // Pre-fill if existing coords
+  const existLat = document.getElementById(latId)?.value;
+  const existLon = document.getElementById(lonId)?.value;
+  if (existLat && existLon) {
+    setPickerPin(parseFloat(existLat), parseFloat(existLon), false);
+  }
+
+  setTimeout(() => pickerMap.invalidateSize(), 120);
+}
+
+function closeMapPicker() {
+  document.getElementById("map-picker-modal").classList.add("hidden");
+}
+
+// Jump the picker map to a Ghana region, then open the picker
+function jumpToRegion(lat, lng, regionName) {
+  window._pickerJumpView = { latlng: [lat, lng], zoom: 12 };
+  // Open the vehicle location picker focused on this region
+  openMapPicker('vehicle-lat', 'vehicle-lon', 'vehicle-loc-pill');
+  // If map already initialised, fly directly
+  if (pickerMap) {
+    pickerMap.setView([lat, lng], 12);
+    window._pickerJumpView = null;
+  }
+  // Pre-fill vehicle name hint
+  const nameEl = document.getElementById('vehicle-name');
+  if (nameEl && !nameEl.value) nameEl.placeholder = `e.g., ${regionName} Ambulance 1`;
+}
+
+function setPickerPin(lat, lon, doReverseGeocode = true) {
+  pickerLat = lat;
+  pickerLon = lon;
+
+  if (pickerMarker) pickerMarker.remove();
+  pickerMarker = L.marker([lat, lon]).addTo(pickerMap);
+  pickerMap.setView([lat, lon], 15);
+
+  document.getElementById("picker-confirm-btn").disabled = false;
+  const display = document.getElementById("picker-selected-display");
+  const text    = document.getElementById("picker-selected-text");
+  display.classList.remove("hidden");
+  text.textContent = `${lat.toFixed(6)}, ${lon.toFixed(6)}${doReverseGeocode ? " — loading address..." : ""}`;
+
+  if (doReverseGeocode) {
+    fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`)
+      .then(r => r.json())
+      .then(d => { text.textContent = "📍 " + (d.display_name || `${lat.toFixed(6)}, ${lon.toFixed(6)}`); })
+      .catch(() => { text.textContent = `📍 ${lat.toFixed(6)}, ${lon.toFixed(6)}`; });
+  }
+}
+
+function confirmPickerLocation() {
+  if (pickerLat === null) return;
+  document.getElementById(pickerLatId).value = pickerLat.toFixed(6);
+  document.getElementById(pickerLonId).value = pickerLon.toFixed(6);
+
+  // Update pill on the form
+  if (pickerPillId) {
+    const pill = document.getElementById(pickerPillId);
+    if (pill) {
+      pill.textContent = document.getElementById("picker-selected-text").textContent;
+      pill.classList.remove("hidden");
+    }
+  }
+  closeMapPicker();
+}
+
+function useGpsForPicker() {
+  if (!navigator.geolocation) return alert("Geolocation is not supported by your browser.");
+  navigator.geolocation.getCurrentPosition(
+    pos => setPickerPin(pos.coords.latitude, pos.coords.longitude),
+    () => alert("Could not get your location. Please click on the map instead.")
+  );
+}
+
+// Picker search (Nominatim)
+function debouncedPickerSearch(q) {
+  clearTimeout(pickerSearchTimer);
+  const el = document.getElementById("picker-results");
+  if (!q || q.length < 3) { el.classList.add("hidden"); return; }
+  pickerSearchTimer = setTimeout(() => runPickerSearch(q), 400);
+}
+
+async function runPickerSearch(q) {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q + ", Ghana")}&format=json&limit=5`
+    );
+    const results = await res.json();
+    const el = document.getElementById("picker-results");
+    if (!results.length) { el.classList.add("hidden"); return; }
+    el.innerHTML = results.map(r => `
+      <div class="loc-result-item"
+        onclick="selectPickerResult(${r.lat}, ${r.lon})">${r.display_name}</div>
+    `).join("");
+    el.classList.remove("hidden");
+  } catch {}
+}
+
+function selectPickerResult(lat, lon) {
+  document.getElementById("picker-results").classList.add("hidden");
+  document.getElementById("picker-search").value = "";
+  setPickerPin(parseFloat(lat), parseFloat(lon));
+}
+
+// Close search results when clicking outside
+document.addEventListener("click", e => {
+  if (!e.target.closest(".loc-search-wrap")) {
+    document.querySelectorAll(".loc-results").forEach(el => el.classList.add("hidden"));
+  }
+});
+
+// ══════════════════════════════════════════════════════════
+//   SUBMIT INCIDENT
+// ══════════════════════════════════════════════════════════
+
+async function submitIncident() {
+  const body = {
+    citizen_name:  document.getElementById("citizen-name").value,
+    incident_type: document.getElementById("incident-type").value,
+    latitude:      parseFloat(document.getElementById("inc-lat").value),
+    longitude:     parseFloat(document.getElementById("inc-lon").value),
+    notes:         document.getElementById("incident-notes").value,
+  };
+  const errEl = document.getElementById("report-error");
+  const errText = document.getElementById("report-error-text");
+  const sucEl = document.getElementById("report-success");
+  const sucText = document.getElementById("report-success-text");
+
+  if (!body.citizen_name || !body.incident_type || isNaN(body.latitude) || isNaN(body.longitude)) {
+    errText.textContent = "Please fill all required fields and select a location on the map.";
+    errEl.classList.remove("hidden"); 
+    return;
+  }
+  errEl.classList.add("hidden");
+
+  try {
+    const res = await fetch(`${API.incident}/incidents`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) { 
+      errText.textContent = data.error || "Failed to submit incident"; 
+      errEl.classList.remove("hidden"); 
+      return; 
+    }
+
+    const responder = Array.isArray(data.responder) && data.responder.length
+      ? data.responder[0] : (data.responder || null);
+    const responderName = responder?.name || null;
+
+    // ── Calculate travel time from assigned responder position ──────
+    let travelMs = 60000; // default 1 min
+    if (responder && responder.latitude) {
+      const dist = haversineKm(responder.latitude, responder.longitude, data.latitude, data.longitude);
+      // 1500 ms per km — nearby (~5 km) = ~8 s, cross-region (~100 km) = ~2.5 min, nationwide (~400 km) = ~10 min max
+      travelMs = Math.max(15000, Math.min(600000, dist * 1500));
+    }
+    const etaSec = Math.round(travelMs / 1000);
+    const etaStr = etaSec >= 60 ? `${Math.ceil(etaSec/60)} min` : `${etaSec} sec`;
+
+    sucText.innerHTML = `<strong>Incident created!</strong> ${responderName ? `Dispatching <strong>${responderName}</strong> — ETA ~${etaStr}` : "⚠️ No available responder found nearby."}`;
+    sucEl.classList.remove("hidden");
+
+    // Show dispatch info panel
+    if (responderName && data.assigned_vehicle_id) {
+      document.getElementById("dispatch-info").classList.remove("hidden");
+      document.getElementById("dispatch-unit").textContent = `🚒 Unit: ${data.assigned_vehicle_id} — ${responderName}`;
+      document.getElementById("dispatch-eta").textContent = `⏱ ETA: ~${etaStr}`;
+      const tl = document.getElementById("dispatch-timeline");
+      const now = Date.now();
+      const inProgressMs = Math.max(2000, travelMs * 0.05);
+      tl.innerHTML = `
+        <div style="display:flex;align-items:center;gap:6px"><span style="background:#3b82f6;color:#fff;padding:1px 7px;border-radius:8px;font-size:10px">NOW</span> Dispatched ✓</div>
+        <div style="display:flex;align-items:center;gap:6px;color:#6b7280"><span style="background:#d97706;color:#fff;padding:1px 7px;border-radius:8px;font-size:10px">~${Math.round(inProgressMs/1000)}s</span> En Route (In Progress)</div>
+        <div style="display:flex;align-items:center;gap:6px;color:#6b7280"><span style="background:#16a34a;color:#fff;padding:1px 7px;border-radius:8px;font-size:10px">~${etaStr}</span> On Scene (Resolved)</div>`;
+    }
+
+    const incId = data._id;
+
+    // ── Auto-advance status via timed API calls ──────────────────────
+    if (incId) {
+      // → in_progress: when vehicle departs (5% of travel time, min 2s)
+      setTimeout(async () => {
+        try {
+          await fetch(`${API.incident}/incidents/${incId}/status`, {
+            method: "PUT", headers: { "Content-Type":"application/json", Authorization:`Bearer ${token}` },
+            body: JSON.stringify({ status: "in_progress" })
+          });
+          loadIncidents();
+        } catch {}
+      }, Math.max(2000, travelMs * 0.05));
+
+      // → resolved: when vehicle arrives
+      setTimeout(async () => {
+        try {
+          await fetch(`${API.incident}/incidents/${incId}/status`, {
+            method: "PUT", headers: { "Content-Type":"application/json", Authorization:`Bearer ${token}` },
+            body: JSON.stringify({ status: "resolved" })
+          });
+          loadIncidents();
+          document.getElementById("dispatch-info").classList.add("hidden");
+        } catch {}
+      }, travelMs);
+    }
+
+    // ── Route the assigned vehicle on the tracking map immediately ───
+    if (data.assigned_vehicle_id && incId) {
+      const vid = data.assigned_vehicle_id;
+      const incLat = data.latitude, incLng = data.longitude;
+      // Load vehicles if not yet loaded
+      if (!vehicleData[vid]) await loadVehicles();
+      const startPos = vehiclePositions[vid]
+        || (responder ? { lat: responder.latitude, lng: responder.longitude } : { lat: incLat, lng: incLng });
+      dispatchRoutes[vid] = {
+        incidentId: incId.toString(), targetLat: incLat, targetLng: incLng,
+        startLat: startPos.lat, startLng: startPos.lng,
+        arrived: false, inProgress: false, incidentType: data.incident_type,
+        startTime: Date.now(), travelMs
+      };
+      if (trackingMap) { drawRouteLine(vid); loadIncidentsOverlay(); }
+      setVehicleHighlight(vid);   // highlight assigned vehicle, dim the rest
+      if (!autoSimRunning) startAutoSim();
+
+      // Auto-switch to tracking tab after 1.5 s so user sees the vehicle moving
+      setTimeout(() => {
+        const trackBtn = document.querySelector("button[onclick*='tracking-tab']");
+        showTab('tracking-tab', trackBtn || null);
+        if (!trackingMapInit) {
+          initTrackingMap();
+        } else if (trackingMap) {
+          trackingMap.invalidateSize();
+          redrawActiveRouteLines();
+          // Pan to show vehicle→incident
+          const pos = vehiclePositions[vid];
+          if (pos) {
+            const bounds = L.latLngBounds([[pos.lat, pos.lng], [incLat, incLng]]);
+            trackingMap.fitBounds(bounds.pad(0.25));
+          }
+          loadIncidentsOverlay();
+        }
+      }, 1500);
+    }
+
+    // Reset form
+    ["citizen-name","incident-notes"].forEach(id => document.getElementById(id).value = "");
+    document.getElementById("incident-type").value = "";
+    document.getElementById("incident-severity").value = "high";
+    document.getElementById("citizen-phone").value = "";
+    document.getElementById("inc-lat").value = "";
+    document.getElementById("inc-lon").value = "";
+    document.getElementById("inc-search").value = "";
+    document.getElementById("inc-location-pill").classList.add("hidden");
+    document.getElementById("map-hint").style.display = "";
+    if (incidentMarker) { incidentMarker.remove(); incidentMarker = null; }
+
+    setTimeout(() => sucEl.classList.add("hidden"), 10000);
+    loadIncidents();
+  } catch (err) {
+    errText.textContent = "Connection failed. Please check your network and try again.";
+    errEl.classList.remove("hidden");
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+//   INCIDENTS LIST
+// ══════════════════════════════════════════════════════════
+
+async function loadIncidents() {
+  const el = document.getElementById("incidents-list");
+  try {
+    // Use /all so resolved incidents remain visible in the log
+    const res = await fetch(`${API.incident}/incidents/all`,
+      { headers: { Authorization: `Bearer ${token}` } });
+    const data = await res.json();
+
+    if (!Array.isArray(data) || !data.length) {
+      el.innerHTML = `<div class="bg-gradient-to-r from-green-50 to-blue-50 rounded-xl p-12 text-center shadow-sm border border-green-200">
+        <p class="text-4xl mb-3">📋</p>
+        <p class="text-gray-700 font-semibold">No Incidents Logged Yet</p>
+        <p class="text-gray-500 text-sm mt-1">Submit an incident using the Report tab to get started.</p>
+      </div>`;
+      updateIncidentStats([]);
+      return;
+    }
+
+    updateIncidentStats(data);
+
+    el.innerHTML = data.map(inc => {
+      const responder  = Array.isArray(inc.responder) ? inc.responder[0] : inc.responder;
+      const hospital   = Array.isArray(inc.hospital)  ? inc.hospital[0]  : inc.hospital;
+      const icons      = { police:"🚔", fire:"🚒", ambulance:"🚑" };
+      const typeEmoji  = inc.incident_type.includes('Medical') ? '🏥'
+        : inc.incident_type.includes('Fire') ? '🔥'
+        : inc.incident_type.includes('Robbery') || inc.incident_type.includes('Crime') ? '💰'
+        : inc.incident_type.includes('Accident') ? '🚗'
+        : inc.incident_type.includes('Explosion') ? '💥'
+        : inc.incident_type.includes('Flood') ? '🌊' : '⚠️';
+      const time = new Date(inc.created_at).toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'});
+      const date = new Date(inc.created_at).toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'});
+      const isResolved = inc.status === 'resolved';
+
+      // Resolved cards get a muted green tint; active ones stay white
+      const cardBg = isResolved
+        ? 'bg-green-50 border-green-200'
+        : 'bg-white border-gray-200 hover:shadow-lg';
+
+      // Status-update dropdown — hidden for resolved incidents
+      const statusControl = isResolved
+        ? `<div class="flex items-center gap-2 bg-green-100 text-green-800 rounded-lg px-3 py-2 text-sm font-semibold">
+             ✅ Incident Resolved
+           </div>`
+        : `<select onchange="updateStatus('${inc._id}', this.value); this.value='';"
+             class="border border-gray-300 rounded-lg px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-red-500">
+             <option value="">📋 Update Status...</option>
+             <option value="dispatched">🔵 Dispatched</option>
+             <option value="in_progress">🟡 In Progress</option>
+             <option value="resolved">✅ Resolved</option>
+           </select>`;
+
+      return `
+      <div class="rounded-lg shadow-md border p-5 transition-all ${cardBg}">
+        <div class="flex flex-col md:flex-row justify-between gap-4">
+          <div class="flex-1">
+            <div class="flex items-center gap-3 mb-2">
+              <span class="text-2xl">${typeEmoji}</span>
+              <div>
+                <p class="font-bold text-gray-800">${inc.incident_type}</p>
+                <span class="status-badge status-${inc.status}">${inc.status.replace(/_/g, ' ')}</span>
+                ${isResolved ? '<span class="ml-2 text-xs text-green-600 font-semibold">• Logged</span>' : ''}
+              </div>
+            </div>
+            <div class="space-y-1 text-sm text-gray-600 mt-2">
+              <p>👤 <strong>${inc.citizen_name}</strong></p>
+              <p>📍 ${parseFloat(inc.latitude).toFixed(4)}, ${parseFloat(inc.longitude).toFixed(4)}</p>
+              ${responder ? `<p>${icons[responder.type] || '🚒'} Unit: <strong>${responder.name}</strong></p>` : ''}
+              ${inc.assigned_vehicle_id ? `<p>🚗 Vehicle: <strong>${inc.assigned_vehicle_id}</strong></p>` : ''}
+              ${hospital  ? `<p>🏥 Hospital: <strong>${hospital.name}</strong></p>` : ''}
+              ${inc.notes ? `<p class="italic text-gray-400 mt-1 text-xs">📝 ${inc.notes}</p>` : ''}
+            </div>
+          </div>
+          <div class="flex flex-col gap-2 min-w-[190px]">
+            ${statusControl}
+            <button onclick="deleteIncident('${inc._id}', '${inc.incident_type}')"
+              class="bg-red-100 hover:bg-red-200 text-red-800 font-semibold px-3 py-2 rounded-lg text-sm transition">
+              🗑️ Delete Log
+            </button>
+            <p class="text-xs text-gray-400 text-center">⏰ ${time} · ${date}</p>
+          </div>
+        </div>
+      </div>`;
+    }).join("");
+  } catch (err) {
+    el.innerHTML = `<div class="bg-red-50 border border-red-200 rounded-lg p-6 text-red-700">
+      <p class="font-semibold">⚠️ Failed to load incidents</p>
+      <p class="text-sm mt-1">${err.message}</p>
+    </div>`;
+  }
+}
+
+function updateIncidentStats(incidents) {
+  const stats = document.getElementById("incident-stats");
+  if (!stats) return;
+
+  const today     = new Date().toDateString();
+  const total     = incidents.length;
+  const active    = incidents.filter(i => i.status !== 'resolved').length;
+  const inProgress = incidents.filter(i => i.status === 'in_progress').length;
+  const resolved  = incidents.filter(i => i.status === 'resolved').length;
+  const resolvedToday = incidents.filter(i =>
+    i.status === 'resolved' && new Date(i.updated_at || i.created_at).toDateString() === today
+  ).length;
+
+  stats.innerHTML = `
+    <div class="card text-center animate-fadeIn"><p class="text-4xl font-bold text-red-600">${total}</p><p class="text-gray-600 text-sm mt-2">Total Logged</p></div>
+    <div class="card text-center animate-fadeIn"><p class="text-4xl font-bold text-blue-600">${active}</p><p class="text-gray-600 text-sm mt-2">Active</p></div>
+    <div class="card text-center animate-fadeIn"><p class="text-4xl font-bold text-amber-500">${inProgress}</p><p class="text-gray-600 text-sm mt-2">In Progress</p></div>
+    <div class="card text-center animate-fadeIn"><p class="text-4xl font-bold text-green-600">${resolvedToday}</p><p class="text-gray-600 text-sm mt-2">Resolved Today</p></div>
+  `;
+}
+
+async function updateStatus(id, status) {
+  if (!status) return;
+  await fetch(`${API.incident}/incidents/${id}/status`, {
+    method: "PUT",
+    headers: { "Content-Type":"application/json", "Authorization":`Bearer ${token}` },
+    body: JSON.stringify({ status }),
+  });
+  loadIncidents();
+}
+
+// Store the incident ID and type for confirmation modal
+let pendingDeleteId = null;
+let pendingDeleteType = null;
+
+function openDeleteConfirmation(id, incidentType) {
+  pendingDeleteId = id;
+  pendingDeleteType = incidentType;
+  
+  // Update modal text
+  document.getElementById("confirm-incident-type").textContent = incidentType;
+  
+  // Show modal
+  document.getElementById("delete-confirmation-modal").classList.remove("hidden");
+}
+
+function cancelDelete() {
+  // Close modal
+  document.getElementById("delete-confirmation-modal").classList.add("hidden");
+  
+  // Clear stored values
+  pendingDeleteId = null;
+  pendingDeleteType = null;
+}
+
+async function confirmDelete() {
+  if (!pendingDeleteId) return;
+  
+  // Close modal immediately
+  document.getElementById("delete-confirmation-modal").classList.add("hidden");
+  
+  // Perform deletion
+  try {
+    const res = await fetch(`${API.incident}/incidents/${pendingDeleteId}`, {
+      method: "DELETE",
+      headers: { "Authorization":`Bearer ${token}` },
+    });
+    
+    const errEl = document.getElementById("report-error");
+    const errText = document.getElementById("report-error-text");
+    const sucEl = document.getElementById("report-success");
+    const sucText = document.getElementById("report-success-text");
+    
+    const data = await res.json();
+    
+    if (!res.ok) {
+      errText.innerHTML = `<strong>❌ Failed to delete incident</strong><br>${data.error || "Please try again."}`;
+      errEl.classList.remove("hidden");
+      setTimeout(() => errEl.classList.add("hidden"), 8000);
+      return;
+    }
+    
+    // Show success message
+    sucText.innerHTML = `<strong>✅ Incident deleted successfully</strong>`;
+    sucEl.classList.remove("hidden");
+    setTimeout(() => sucEl.classList.add("hidden"), 5000);
+    
+    loadIncidents();
+  } catch (err) {
+    const errEl = document.getElementById("report-error");
+    const errText = document.getElementById("report-error-text");
+    errText.innerHTML = `<strong>❌ Error deleting incident</strong><br>${err.message}`;
+    errEl.classList.remove("hidden");
+    setTimeout(() => errEl.classList.add("hidden"), 8000);
+  } finally {
+    // Clear stored values
+    pendingDeleteId = null;
+    pendingDeleteType = null;
+  }
+}
+
+async function deleteIncident(id, incidentType) {
+  // Open confirmation modal instead of using browser confirm()
+  openDeleteConfirmation(id, incidentType);
+}
+
+// ══════════════════════════════════════════════════════════
+//   MANAGE TAB
+// ══════════════════════════════════════════════════════════
+
+function loadManageTab() {
+  if (!user) return;
+  if (["hospital_admin","system_admin"].includes(user.role)) loadHospitals();
+  if (["police_admin","fire_admin","system_admin"].includes(user.role)) loadResponders();
+  if (user.role === "ambulance_driver") {
+    const saved = localStorage.getItem("vehicleId");
+    if (saved) {
+      document.getElementById("vehicle-id").value = saved;
+      document.getElementById("update-vehicle-id").value = saved;
+      document.getElementById("driver-status").textContent = `Active vehicle: ${saved}`;
+    } else {
+      document.getElementById("driver-status").textContent = "Register your vehicle to start sending updates.";
+    }
+  }
+}
+
+// ── Hospitals ─────────────────────────────────────────────
+async function loadHospitals() {
+  const el = document.getElementById("hospitals-list");
+  try {
+    const res = await fetch(`${API.incident}/hospitals`,
+      { headers: { Authorization: `Bearer ${token}` } });
+    const data = await res.json();
+    if (!Array.isArray(data) || !data.length) {
+      el.innerHTML = `<p class="text-gray-400 text-sm col-span-full text-center py-8">No hospitals registered yet. Add one to get started.</p>`;
+      return;
+    }
+    const healthPercent = (h) => Math.round((h.available_beds / (h.capacity || 1)) * 100);
+    el.innerHTML = data.map(h => {
+      const pct = healthPercent(h);
+      const healthColor = pct >= 50 ? 'green' : pct >= 25 ? 'yellow' : 'red';
+      return `
+      <div class="bg-gradient-to-br from-white to-gray-50 border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition"
+        data-hospital-id="${h._id}" data-available="${h.available_beds}">
+        <div class="flex items-start justify-between mb-3">
+          <div>
+            <h4 class="font-bold text-gray-800">🏥 ${h.name}</h4>
+            <p class="text-xs text-gray-500 mt-0.5">📍 ${h.latitude?.toFixed(4)}, ${h.longitude?.toFixed(4)}</p>
+          </div>
+          <span class="text-2xl font-bold text-${healthColor}-600">${h.available_beds}/${h.capacity}</span>
+        </div>
+        <div class="mb-3">
+          <div class="flex justify-between items-center text-xs text-gray-600 mb-1">
+            <span>Available Capacity</span>
+            <span class="font-semibold">${pct}%</span>
+          </div>
+          <div class="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+            <div class="bg-${healthColor}-500 h-full transition-all" style="width: ${pct}%"></div>
+          </div>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="adjustHospitalBeds('${h._id}', 1)"
+            class="flex-1 px-2 py-1.5 text-xs bg-green-100 text-green-800 rounded hover:bg-green-200 transition font-semibold">+1 Bed</button>
+          <button onclick="adjustHospitalBeds('${h._id}', -1)"
+            class="flex-1 px-2 py-1.5 text-xs bg-red-100 text-red-800 rounded hover:bg-red-200 transition font-semibold">-1 Bed</button>
+        </div>
+      </div>
+    `; }).join("");
+  } catch (err) {
+    el.innerHTML = `<p class="text-red-500 text-sm col-span-full">Failed to load hospitals: ${err.message}</p>`;
+  }
+}
+
+async function createHospital() {
+  const name      = document.getElementById("new-hospital-name").value.trim();
+  const latitude  = parseFloat(document.getElementById("new-hospital-lat").value);
+  const longitude = parseFloat(document.getElementById("new-hospital-lon").value);
+  const beds      = parseInt(document.getElementById("new-hospital-beds").value, 10);
+
+  if (!name || isNaN(latitude) || isNaN(longitude) || isNaN(beds)) {
+    const errEl = document.getElementById("report-error");
+    const errText = document.getElementById("report-error-text");
+    errText.innerHTML = `<strong>❌ Please fill all fields and pick a location on the map.</strong>`;
+    errEl.classList.remove("hidden");
+    setTimeout(() => errEl.classList.add("hidden"), 5000);
+    return;
+  }
+  try {
+    await fetch(`${API.incident}/hospitals`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ name, latitude, longitude, capacity: beds, available_beds: beds }),
+    });
+    document.getElementById("new-hospital-name").value = "";
+    document.getElementById("new-hospital-beds").value = "";
+    document.getElementById("new-hospital-lat").value  = "";
+    document.getElementById("new-hospital-lon").value  = "";
+    document.getElementById("hospital-loc-pill").classList.add("hidden");
+    loadHospitals();
+  } catch (err) {
+    const errEl = document.getElementById("report-error");
+    const errText = document.getElementById("report-error-text");
+    errText.innerHTML = `<strong>❌ Failed to create hospital:</strong> ${err.message}`;
+    errEl.classList.remove("hidden");
+    setTimeout(() => errEl.classList.add("hidden"), 5000);
+  }
+}
+
+async function adjustHospitalBeds(id, delta) {
+  const card = document.querySelector(`[data-hospital-id="${id}"]`);
+  if (!card) return;
+  const updated = Math.max(0, parseInt(card.dataset.available || "0", 10) + delta);
+  try {
+    await fetch(`${API.incident}/hospitals/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ available_beds: updated }),
+    });
+    loadHospitals();
+  } catch (err) {
+    const errEl = document.getElementById("report-error");
+    const errText = document.getElementById("report-error-text");
+    errText.innerHTML = `<strong>❌ Failed to update capacity:</strong> ${err.message}`;
+    errEl.classList.remove("hidden");
+    setTimeout(() => errEl.classList.add("hidden"), 5000);
+  }
+}
+
+// ── Responders ────────────────────────────────────────────
+async function loadResponders() {
+  const el = document.getElementById("responders-list");
+  try {
+    const res = await fetch(`${API.incident}/responders`,
+      { headers: { Authorization: `Bearer ${token}` } });
+    const data = await res.json();
+    if (!Array.isArray(data) || !data.length) {
+      el.innerHTML = `<p class="text-gray-400 text-sm col-span-full text-center py-8">No responders registered yet. Add one to get started.</p>`;
+      return;
+    }
+    const typeIcon = { police:"🚔", fire:"🚒", ambulance:"🚑" };
+    const typeColor = { police:"blue", fire:"orange", ambulance:"red" };
+    el.innerHTML = data.map(r => {
+      const color = typeColor[r.type] || "gray";
+      return `
+      <div class="bg-gradient-to-br from-white to-gray-50 border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition">
+        <div class="flex items-start justify-between mb-3">
+          <div>
+            <h4 class="font-bold text-gray-800 flex items-center gap-2">
+              <span class="text-2xl">${typeIcon[r.type]||"🚗"}</span>
+              ${r.name}
+            </h4>
+            <p class="text-xs text-gray-500 mt-0.5 capitalize">${r.type} • 📍 ${r.latitude.toFixed(4)}, ${r.longitude.toFixed(4)}</p>
+          </div>
+          <span class="px-3 py-1 rounded-full font-semibold text-sm ${
+            r.is_available ? `bg-green-100 text-green-700` : `bg-red-100 text-red-700`
+          }">
+            ${r.is_available ? '✓ Available' : '⊗ Busy'}
+          </span>
+        </div>
+        <div class="pt-2 border-t border-gray-200 text-xs text-gray-500">
+          Unit is ${r.is_available ? 'ready for dispatch' : 'currently responding to an incident'}
+        </div>
+      </div>
+    `; }).join("");
+  } catch (err) {
+    el.innerHTML = `<p class="text-red-500 text-sm col-span-full">Failed to load responders: ${err.message}</p>`;
+  }
+}
+
+async function addResponder() {
+  const name      = document.getElementById("new-responder-name").value.trim();
+  const type      = document.getElementById("new-responder-type").value;
+  const latitude  = parseFloat(document.getElementById("new-responder-lat").value);
+  const longitude = parseFloat(document.getElementById("new-responder-lon").value);
+
+  if (!name || !type || isNaN(latitude) || isNaN(longitude)) {
+    const errEl = document.getElementById("report-error");
+    const errText = document.getElementById("report-error-text");
+    errText.innerHTML = `<strong>❌ Please fill all fields and pick a station location on the map.</strong>`;
+    errEl.classList.remove("hidden");
+    setTimeout(() => errEl.classList.add("hidden"), 5000);
+    return;
+  }
+  try {
+    await fetch(`${API.incident}/responders`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ name, type, latitude, longitude }),
+    });
+    document.getElementById("new-responder-name").value = "";
+    document.getElementById("new-responder-lat").value  = "";
+    document.getElementById("new-responder-lon").value  = "";
+    document.getElementById("responder-loc-pill").classList.add("hidden");
+    loadResponders();
+  } catch (err) {
+    const errEl = document.getElementById("report-error");
+    const errText = document.getElementById("report-error-text");
+    errText.innerHTML = `<strong>❌ Failed to add responder:</strong> ${err.message}`;
+    errEl.classList.remove("hidden");
+    setTimeout(() => errEl.classList.add("hidden"), 5000);
+  }
+}
+
+// ── Vehicle / Driver ──────────────────────────────────────
+async function registerVehicle() {
+  const vehicleId   = document.getElementById("vehicle-id").value.trim();
+  const vehicleName = document.getElementById("vehicle-name").value.trim();
+  const vehicleType = document.getElementById("vehicle-type").value;
+  const latitude    = parseFloat(document.getElementById("vehicle-lat").value);
+  const longitude   = parseFloat(document.getElementById("vehicle-lon").value);
+
+  if (!vehicleId || !vehicleName || isNaN(latitude) || isNaN(longitude)) {
+    const driverStatus = document.getElementById("driver-status");
+    driverStatus.innerHTML = `<span class="text-red-600"><strong>❌ Error:</strong> Please fill all fields and pick a starting location on the map.</span>`;
+    return;
+  }
+  try {
+    const res = await fetch(`${API.dispatch}/vehicles/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ vehicle_id: vehicleId, vehicle_name: vehicleName, vehicle_type: vehicleType, latitude, longitude }),
+    });
+    const data = await res.json();
+    const driverStatus = document.getElementById("driver-status");
+    
+    if (!res.ok) {
+      driverStatus.innerHTML = `<span class="text-red-600"><strong>❌ Registration Failed:</strong> ${data.error || "Please try again."}</span>`;
+      return;
+    }
+    
+    localStorage.setItem("vehicleId", vehicleId);
+    document.getElementById("update-vehicle-id").value = vehicleId;
+    driverStatus.innerHTML = `<span class="text-green-600"><strong>✅ Vehicle registered successfully!</strong> Vehicle ID: ${vehicleId}</span>`;
+    
+    // Reset the form
+    document.getElementById("vehicle-id").value = "";
+    document.getElementById("vehicle-name").value = "";
+    document.getElementById("vehicle-type").value = "ambulance";
+    document.getElementById("vehicle-lat").value = "";
+    document.getElementById("vehicle-lon").value = "";
+    document.getElementById("vehicle-loc-pill").classList.add("hidden");
+    
+    // Refresh vehicles in tracking tab
+    loadVehicles();
+  } catch (err) {
+    const driverStatus = document.getElementById("driver-status");
+    driverStatus.innerHTML = `<span class="text-red-600"><strong>❌ Error:</strong> ${err.message}</span>`;
+  }
+}
+
+async function updateVehicleLocation() {
+  const vehicleId = document.getElementById("update-vehicle-id").value.trim();
+  const latitude  = parseFloat(document.getElementById("update-lat").value);
+  const longitude = parseFloat(document.getElementById("update-lon").value);
+  const status    = document.getElementById("update-status").value;
+  const driverStatus = document.getElementById("driver-status");
+
+  if (!vehicleId || isNaN(latitude) || isNaN(longitude)) {
+    driverStatus.innerHTML = `<span class="text-red-600"><strong>❌ Error:</strong> Please fill all fields and pick a location on the map.</span>`;
+    return;
+  }
+  try {
+    const res = await fetch(`${API.dispatch}/vehicles/${vehicleId}/location`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ latitude, longitude, status }),
+    });
+    const data = await res.json();
+    
+    if (!res.ok) {
+      driverStatus.innerHTML = `<span class="text-red-600"><strong>❌ Update Failed:</strong> ${data.error || "Please try again."}</span>`;
+      return;
+    }
+    
+    driverStatus.innerHTML = `<span class="text-green-600"><strong>✅ Location updated for vehicle ${vehicleId}</strong></span>`;
+    
+    // Reset the form
+    document.getElementById("update-lat").value = "";
+    document.getElementById("update-lon").value = "";
+    document.getElementById("update-loc-pill").classList.add("hidden");
+    
+    // Refresh vehicles to show new location
+    loadVehicles();
+  } catch (err) {
+    driverStatus.innerHTML = `<span class="text-red-600"><strong>❌ Error:</strong> ${err.message}</span>`;
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+//   TRACKING MAP  — animated movement + auto-simulation
+// ══════════════════════════════════════════════════════════
+
+let trackingMapInit  = false;
+let vehiclePositions = {};   // vehicleId → { lat, lng }
+let vehicleAnims     = {};   // vehicleId → intervalId
+let vehicleTrails    = {};   // vehicleId → { points:[], polyline:L.Polyline|null }
+let vehicleData      = {};   // vehicleId → full vehicle object
+let showTrails       = false;
+let autoSimRunning   = false;
+let autoSimInterval  = null;
+let simCount         = 0;
+let simLog           = [];
+
+// ── Highlight state ──────────────────────────────────────
+let activeDispatchVehicle = null;  // vehicleId currently highlighted
+let routeBackLines        = {};    // vehicleId → background glow polyline
+let routeAnimInterval     = null;  // setInterval for animated dashOffset
+let dispatchPanelInterval = null;  // setInterval for ETA countdown
+
+// Trail colours by vehicle type
+const TRAIL_COLORS = { police:"#7c3aed", fire:"#dc2626", ambulance:"#059669", default:"#3b82f6" };
+const ANIM_DURATION = 400; // ms for smooth movement
+// Ring colours per vehicle type
+const RING_COLORS  = { police:"#3b82f6", fire:"#ef4444", ambulance:"#10b981" };
+
+// ── Vehicle marker icon factory ───────────────────────────
+// state: 'normal' | 'active' | 'dimmed'
+function buildVehicleMarkerIcon(vehicleId, state) {
+  const vd    = vehicleData[vehicleId] || {};
+  const emoji = vehicleIcons[vd.vehicle_type] || "🚗";
+  const name  = (vd.vehicle_name || vehicleId).substring(0, 12);
+  const ring  = RING_COLORS[vd.vehicle_type] || "#ef4444";
+
+  if (state === 'active') {
+    return L.divIcon({
+      html: `<div style="position:relative;width:64px;height:64px;display:flex;align-items:center;justify-content:center">
+        <div style="position:absolute;width:64px;height:64px;border-radius:50%;border:3px solid ${ring};animation:vehicleRingPulse 1.5s ease-out infinite;pointer-events:none"></div>
+        <div style="position:absolute;width:52px;height:52px;border-radius:50%;border:2px solid ${ring};animation:vehicleRingPulse 1.5s ease-out infinite 0.55s;pointer-events:none"></div>
+        <div style="position:absolute;width:42px;height:42px;border-radius:50%;background:white;border:3px solid ${ring};box-shadow:0 0 18px ${ring}99;z-index:1;pointer-events:none"></div>
+        <div style="font-size:26px;position:relative;z-index:2;line-height:1;pointer-events:none">${emoji}</div>
+        <div style="position:absolute;top:66px;left:50%;transform:translateX(-50%);white-space:nowrap;background:${ring};color:white;font-size:9px;font-weight:800;padding:2px 7px;border-radius:4px;z-index:3;letter-spacing:0.3px">${name}</div>
+      </div>`,
+      className: "", iconAnchor: [32, 32]
+    });
+  } else if (state === 'dimmed') {
+    return L.divIcon({
+      html: `<div style="font-size:20px;filter:grayscale(0.75) drop-shadow(1px 2px 3px rgba(0,0,0,.25));line-height:1;opacity:0.38">${emoji}</div>`,
+      className: "", iconAnchor: [10, 10]
+    });
+  } else {
+    return L.divIcon({
+      html: `<div style="font-size:30px;filter:drop-shadow(1px 2px 4px rgba(0,0,0,.45));line-height:1">${emoji}</div>`,
+      className: "", iconAnchor: [15, 15]
+    });
+  }
+}
+
+// ── Incident beacon icon factory ──────────────────────────
+function buildIncidentBeaconIcon(inc) {
+  const typeEmoji = {
+    "Medical Emergency":"🏥","Fire Outbreak":"🔥","Robbery":"🔫",
+    "Road Accident":"🚧","Crime":"👮","Explosion":"💥","Flood":"🌊","Other":"⚠️"
+  }[inc.incident_type] || "🚨";
+  const isActive = inc.status === "dispatched" || inc.status === "in_progress";
+  const isResolved = inc.status === "resolved";
+  const ringColor = isResolved ? "#16a34a" : "#dc2626";
+  const size = isActive ? 36 : 26;
+  const rings = isActive ? `
+    <div style="position:absolute;width:72px;height:72px;border-radius:50%;background:${ringColor}18;animation:incidentBeaconPulse 1.4s ease-out infinite;pointer-events:none"></div>
+    <div style="position:absolute;width:56px;height:56px;border-radius:50%;background:${ringColor}28;animation:incidentBeaconPulse 1.4s ease-out infinite 0.5s;pointer-events:none"></div>` : "";
+  return L.divIcon({
+    html: `<div style="position:relative;width:72px;height:72px;display:flex;align-items:center;justify-content:center">
+      ${rings}
+      <div style="font-size:${size}px;position:relative;z-index:2;filter:drop-shadow(0 2px 10px ${ringColor}bb);line-height:1">${isResolved ? "✅" : typeEmoji}</div>
+      <div style="position:absolute;top:74px;left:50%;transform:translateX(-50%);white-space:nowrap;background:${ringColor};color:#fff;font-size:9px;font-weight:800;padding:2px 8px;border-radius:4px;z-index:3;max-width:120px;overflow:hidden;text-overflow:ellipsis">${isResolved ? "Resolved" : inc.incident_type}</div>
+    </div>`,
+    className: "", iconAnchor: [36, 36]
+  });
+}
+
+// ── Highlight the dispatched vehicle; keep all others fully visible ──
+function setVehicleHighlight(vehicleId) {
+  activeDispatchVehicle = vehicleId;
+  // Only change the dispatched vehicle — others stay 'normal'
+  if (trackingMarkers[vehicleId]) {
+    trackingMarkers[vehicleId].setIcon(buildVehicleMarkerIcon(vehicleId, 'active'));
+  }
+  // Animate route line dashes flowing toward incident
+  startRouteLineAnimation(vehicleId);
+  // Start live dispatch panel countdown
+  _updateDispatchPanel(vehicleId);
+  if (dispatchPanelInterval) clearInterval(dispatchPanelInterval);
+  dispatchPanelInterval = setInterval(() => {
+    if (activeDispatchVehicle) _updateDispatchPanel(activeDispatchVehicle);
+  }, 1000);
+}
+
+// ── Clear busy state — vehicle returns to normal/available ────────────
+function clearVehicleHighlight(vehicleId) {
+  activeDispatchVehicle = null;
+  if (routeAnimInterval)     { clearInterval(routeAnimInterval);     routeAnimInterval = null; }
+  if (dispatchPanelInterval) { clearInterval(dispatchPanelInterval); dispatchPanelInterval = null; }
+  // Remove background glow line
+  if (routeBackLines[vehicleId]) { routeBackLines[vehicleId].remove(); delete routeBackLines[vehicleId]; }
+  // Restore dispatched vehicle to normal (idle/available)
+  if (trackingMarkers[vehicleId]) {
+    trackingMarkers[vehicleId].setIcon(buildVehicleMarkerIcon(vehicleId, 'normal'));
+  }
+  _showDispatchResolved(vehicleId);
+}
+
+// ── Animate route dashOffset (flowing effect) ─────────────
+function startRouteLineAnimation(vehicleId) {
+  if (routeAnimInterval) clearInterval(routeAnimInterval);
+  let offset = 0;
+  routeAnimInterval = setInterval(() => {
+    const line = routeLines[vehicleId];
+    if (line) { offset = (offset + 1) % 21; line.setStyle({ dashOffset: String(-offset) }); }
+    else { clearInterval(routeAnimInterval); routeAnimInterval = null; }
+  }, 40);
+}
+
+// ── Live dispatch progress panel ──────────────────────────
+function _updateDispatchPanel(vehicleId) {
+  const panel = document.getElementById("dispatch-progress-panel");
+  if (!panel) return;
+  const route = dispatchRoutes[vehicleId];
+  const vd    = vehicleData[vehicleId] || {};
+  if (!route || route.arrived) { panel.classList.add("hidden"); return; }
+
+  const elapsed = Math.max(0, Date.now() - (route.startTime || Date.now()));
+  const pct     = Math.min(100, Math.round((elapsed / route.travelMs) * 100));
+  const remMs   = Math.max(0, route.travelMs - elapsed);
+  const remStr  = remMs >= 60000 ? `${Math.ceil(remMs / 60000)} min` : `${Math.ceil(remMs / 1000)} sec`;
+  const icon    = vehicleIcons[vd.vehicle_type] || "🚗";
+  const ring    = RING_COLORS[vd.vehicle_type] || "#ef4444";
+
+  const statusLabel = { dispatched:"Dispatched", in_progress:"En Route", on_scene:"On Scene" }[vd.status] || vd.status || "Dispatched";
+  const statusBg    = { dispatched:"#3b82f6", in_progress:"#d97706", on_scene:"#16a34a" }[vd.status] || "#6b7280";
+
+  // Three-step timeline
+  const steps = [
+    { label:"Dispatched", done: true },
+    { label:"En Route",   done: route.inProgress },
+    { label:"On Scene",   done: false }
+  ];
+  const timelineHtml = steps.map((s, i) => `
+    <div style="display:flex;align-items:center;gap:4px;font-size:10px">
+      <span style="width:14px;height:14px;border-radius:50%;background:${s.done?ring:'#d1d5db'};display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:8px;flex-shrink:0">${s.done?"✓":i+1}</span>
+      <span style="color:${s.done?'#111827':'#9ca3af'};font-weight:${s.done?700:400}">${s.label}</span>
+    </div>`).join(`<div style="height:1px;flex:1;background:#e5e7eb;margin:0 2px"></div>`);
+
+  panel.classList.remove("hidden");
+  panel.innerHTML = `
+    <div class="flex items-center justify-between mb-2">
+      <span class="font-bold text-red-700 text-xs tracking-wide">🚨 ACTIVE RESPONSE</span>
+      <span class="text-xs font-bold text-white px-2 py-0.5 rounded-full" style="background:${statusBg}">${statusLabel}</span>
+    </div>
+    <div class="flex items-center gap-2 mb-3 p-2 bg-white rounded-lg border border-red-200">
+      <span class="text-2xl">${icon}</span>
+      <div class="flex-1 min-w-0">
+        <p class="font-bold text-gray-800 text-sm truncate">${vd.vehicle_name || vehicleId}</p>
+        <p class="text-xs text-gray-500 truncate">${route.incidentType || "Emergency"}</p>
+      </div>
+      <div class="text-right flex-shrink-0">
+        <p class="text-sm font-bold" style="color:${statusBg}">~${pct < 100 ? remStr : "Now"}</p>
+        <p class="text-xs text-gray-400">remaining</p>
+      </div>
+    </div>
+    <div class="mb-3">
+      <div class="flex justify-between text-xs text-gray-500 mb-1">
+        <span>Journey Progress</span><span class="font-bold text-gray-700">${pct}%</span>
+      </div>
+      <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+        <div class="h-full rounded-full transition-all duration-500" style="width:${pct}%;background:linear-gradient(90deg,${ring},${ring}cc)"></div>
+      </div>
+    </div>
+    <div class="flex items-center gap-1 mb-3">${timelineHtml}</div>
+    <div class="flex gap-2">
+      <button onclick="focusDispatch('${vehicleId}')" class="flex-1 text-xs font-bold text-white rounded-lg py-1.5 transition" style="background:${ring}">📍 Focus Route</button>
+      <button onclick="focusVehicle('${vehicleId}')" class="flex-1 text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg py-1.5 transition">🚗 Track Unit</button>
+    </div>
+  `;
+}
+
+function _showDispatchResolved(vehicleId) {
+  const panel = document.getElementById("dispatch-progress-panel");
+  if (!panel) return;
+  const vd   = vehicleData[vehicleId] || {};
+  const icon = vehicleIcons[vd.vehicle_type] || "🚗";
+  panel.classList.remove("hidden");
+  panel.style.animation = "none";
+  panel.style.borderColor = "#86efac";
+  panel.style.background  = "#f0fdf4";
+  panel.innerHTML = `
+    <div class="text-center py-2">
+      <div class="text-3xl mb-1">✅</div>
+      <p class="font-bold text-green-700 text-sm">Incident Resolved</p>
+      <p class="text-xs text-gray-500 mt-0.5">${icon} ${vd.vehicle_name || vehicleId} is on scene</p>
+    </div>`;
+  setTimeout(() => {
+    panel.classList.add("hidden");
+    panel.style.animation = "";
+    panel.style.borderColor = "";
+    panel.style.background  = "";
+  }, 8000);
+}
+
+function focusDispatch(vehicleId) {
+  const route = dispatchRoutes[vehicleId];
+  const pos   = vehiclePositions[vehicleId];
+  if (route && pos && trackingMap) {
+    trackingMap.fitBounds([[pos.lat, pos.lng], [route.targetLat, route.targetLng]], { padding: [70, 70] });
+  }
+}
+
+// Incident overlay (shown on tracking map)
+let incidentOverlayMarkers = {};  // incidentId → L.Marker
+let dispatchRoutes = {};          // vehicleId  → { incidentId, targetLat, targetLng, arrived }
+let routeLines     = {};          // vehicleId  → L.Polyline
+const ARRIVAL_KM   = 1.0;        // 1 km = "arrived"
+
+// Haversine great-circle distance in km
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const R = 6371, r = Math.PI / 180;
+  const dLat = (lat2 - lat1) * r, dLng = (lng2 - lng1) * r;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*r)*Math.cos(lat2*r)*Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function redrawActiveRouteLines() {
+  if (!trackingMap) return;
+  Object.entries(dispatchRoutes).forEach(([vid, route]) => {
+    if (!route.arrived && vehiclePositions[vid]) {
+      if (routeLines[vid]) { routeLines[vid].remove(); delete routeLines[vid]; }
+      drawRouteLine(vid);
+    }
+  });
+}
+
+function initTrackingMap() {
+  if (trackingMapInit) return;
+  trackingMapInit = true;
+  // Start at Ghana-wide view so all vehicles are visible
+  trackingMap = L.map("tracking-map").setView([7.9465, -1.0232], 7);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    { attribution: "© OpenStreetMap contributors" }).addTo(trackingMap);
+  // Load all vehicles, then draw routes and fit map to show everyone
+  loadVehicles().then(() => {
+    redrawActiveRouteLines();
+    loadIncidentsOverlay();
+    _fitAllOrActiveRoutes();
+  });
+  setTimeout(() => trackingMap.invalidateSize(), 150);
+}
+
+function _fitAllOrActiveRoutes() {
+  if (!trackingMap) return;
+  const activeRoutes = Object.entries(dispatchRoutes).filter(([,r]) => !r.arrived);
+  const points = [];
+  if (activeRoutes.length) {
+    // Zoom to show the active dispatch (vehicle + incident)
+    activeRoutes.forEach(([vid, r]) => {
+      const pos = vehiclePositions[vid];
+      if (pos) { points.push([pos.lat, pos.lng]); }
+      points.push([r.targetLat, r.targetLng]);
+    });
+  } else {
+    // No active dispatch — fit to show all vehicles
+    Object.values(vehiclePositions).forEach(p => points.push([p.lat, p.lng]));
+  }
+  if (points.length === 1) { trackingMap.setView(points[0], 13); }
+  else if (points.length > 1) { trackingMap.fitBounds(L.latLngBounds(points).pad(0.15)); }
+}
+
+function reinitTrackingMap() {
+  if (trackingMap) {
+    setTimeout(() => trackingMap.invalidateSize(), 150);
+    loadVehicles().then(() => {
+      redrawActiveRouteLines();
+      loadIncidentsOverlay();
+    });
+  }
+}
+
+// Expose fitAll for the "Fit" button
+function fitAllVehicles() {
+  _fitAllOrActiveRoutes();
+}
+
+async function loadVehicles() {
+  try {
+    const res = await fetch(`${API.dispatch}/vehicles`,
+      { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) throw new Error("Dispatch service error");
+    const vehicles = await res.json();
+    renderVehicles(vehicles);
+  } catch (err) {
+    console.error("Failed to load vehicles:", err);
+  }
+}
+
+const vehicleIcons = { police:"🚔", fire:"🚒", ambulance:"🚑" };
+
+// ── Smooth animated marker movement ──────────────────────
+function animateMarkerTo(vehicleId, newLat, newLng) {
+  const marker = trackingMarkers[vehicleId];
+  if (!marker || !trackingMap) return;
+
+  const from = vehiclePositions[vehicleId] || { lat: newLat, lng: newLng };
+  // Skip if already there
+  if (Math.abs(from.lat - newLat) < 0.00001 && Math.abs(from.lng - newLng) < 0.00001) return;
+
+  if (vehicleAnims[vehicleId]) clearInterval(vehicleAnims[vehicleId]);
+
+  const startTime = Date.now();
+  const fromLat = from.lat, fromLng = from.lng;
+
+  vehicleAnims[vehicleId] = setInterval(() => {
+    const t = Math.min((Date.now() - startTime) / ANIM_DURATION, 1);
+    // Ease-in-out cubic
+    const ease = t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2;
+    marker.setLatLng([fromLat + (newLat - fromLat) * ease,
+                      fromLng + (newLng - fromLng) * ease]);
+    if (t >= 1) {
+      clearInterval(vehicleAnims[vehicleId]);
+      vehicleAnims[vehicleId] = null;
+      vehiclePositions[vehicleId] = { lat: newLat, lng: newLng };
+      if (showTrails) updateVehicleTrail(vehicleId, newLat, newLng);
+      marker.setPopupContent(buildVehiclePopup(vehicleId, newLat, newLng));
+    }
+  }, 16);
+}
+
+// ── Trail (breadcrumb polyline) ───────────────────────────
+function updateVehicleTrail(vehicleId, lat, lng) {
+  if (!trackingMap) return;
+  if (!vehicleTrails[vehicleId]) vehicleTrails[vehicleId] = { points: [], polyline: null };
+  const trail = vehicleTrails[vehicleId];
+  trail.points.push([lat, lng]);
+  if (trail.points.length > 25) trail.points.shift();
+  if (trail.polyline) trail.polyline.remove();
+  if (trail.points.length > 1) {
+    const color = TRAIL_COLORS[vehicleData[vehicleId]?.vehicle_type] || TRAIL_COLORS.default;
+    trail.polyline = L.polyline(trail.points, {
+      color, weight: 3, opacity: 0.65, dashArray: "6 5"
+    }).addTo(trackingMap);
+  }
+}
+
+function toggleTrails() {
+  showTrails = document.getElementById("trail-toggle").checked;
+  if (!showTrails) {
+    // Remove all existing trail polylines
+    Object.values(vehicleTrails).forEach(t => { if (t.polyline) t.polyline.remove(); });
+    vehicleTrails = {};
+  }
+}
+
+
+function buildVehiclePopup(vehicleId, lat, lng, v) {
+  const vd = v || vehicleData[vehicleId] || {};
+  const icon = vehicleIcons[vd.vehicle_type] || "🚗";
+  const statusClass = { idle:"gray", dispatched:"blue", on_scene:"green", returning:"orange" }[vd.status] || "gray";
+  return `<div style="min-width:170px;font-family:sans-serif">
+    <div style="font-size:22px;text-align:center;margin-bottom:6px">${icon}</div>
+    <p style="font-weight:700;font-size:13px;margin:0 0 4px">${vd.vehicle_name || vehicleId}</p>
+    <p style="font-size:11px;color:#6b7280;margin:2px 0">ID: <code>${vehicleId}</code></p>
+    <p style="font-size:11px;color:#6b7280;margin:2px 0">Status: <strong style="color:#${statusClass==='blue'?'1d4ed8':statusClass==='green'?'065f46':statusClass==='orange'?'c2410c':'374151'}">${(vd.status||'unknown').replace(/_/g,' ')}</strong></p>
+    <p style="font-size:11px;color:#6b7280;margin:4px 0 0">📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}</p>
+  </div>`;
+}
+
+// ── Main render function ──────────────────────────────────
+function renderVehicles(vehicles) {
+  if (!Array.isArray(vehicles)) return;
+
+  vehicles.forEach(v => {
+    let lat = parseFloat(v.latitude), lng = parseFloat(v.longitude);
+    if (isNaN(lat) || isNaN(lng)) return; // skip truly invalid
+    // Vehicles with no GPS yet → place at Ghana center so they're visible
+    if (!lat && !lng) { lat = 7.9465; lng = -1.0232; }
+    vehicleData[v.vehicle_id] = v;
+
+    // Active dispatch vehicle gets 'active' (pulsing ring); all others stay 'normal'
+    const state = v.vehicle_id === activeDispatchVehicle ? 'active' : 'normal';
+
+    if (trackingMarkers[v.vehicle_id]) {
+      animateMarkerTo(v.vehicle_id, lat, lng);
+      // Only update icon for the active vehicle to avoid unnecessary DOM resets
+      if (state === 'active') {
+        trackingMarkers[v.vehicle_id].setIcon(buildVehicleMarkerIcon(v.vehicle_id, 'active'));
+      }
+    } else if (trackingMap) {
+      // Create marker for first time
+      trackingMarkers[v.vehicle_id] = L.marker([lat, lng], { icon: buildVehicleMarkerIcon(v.vehicle_id, state) })
+        .addTo(trackingMap)
+        .bindPopup(buildVehiclePopup(v.vehicle_id, lat, lng, v));
+      vehiclePositions[v.vehicle_id] = { lat, lng };
+    }
+  });
+
+  renderVehicleList(vehicles);
+}
+
+function renderVehicleList(vehicles) {
+  const listEl = document.getElementById("vehicle-list");
+  const simEl  = document.getElementById("sim-vehicle");
+
+  if (!vehicles.length) {
+    if (listEl) listEl.innerHTML = `<p class="text-gray-400 text-xs text-center py-3">No vehicles registered yet.<br>Add one in Management → Vehicles.</p>`;
+    return;
+  }
+
+  if (listEl) {
+    listEl.innerHTML = vehicles.map(v => {
+      const icon = vehicleIcons[v.vehicle_type] || "🚗";
+      const isBusy = v.vehicle_id === activeDispatchVehicle
+        || ["dispatched","in_progress","on_scene"].includes(v.status);
+      const statusMap = {
+        idle:        { cls:"bg-green-100 text-green-700",  label:"Available" },
+        dispatched:  { cls:"bg-blue-100 text-blue-700",    label:"Dispatched" },
+        in_progress: { cls:"bg-amber-100 text-amber-700",  label:"En Route" },
+        on_scene:    { cls:"bg-purple-100 text-purple-700",label:"On Scene" },
+        returning:   { cls:"bg-orange-100 text-orange-700",label:"Returning" },
+      };
+      const st = statusMap[v.status] || { cls:"bg-gray-100 text-gray-600", label: v.status.replace(/_/g,' ') };
+      const pos = vehiclePositions[v.vehicle_id];
+      const busyBorder = isBusy ? "border-blue-300 bg-blue-50" : "border-gray-200 bg-gray-50";
+      const busyDot = v.vehicle_id === activeDispatchVehicle
+        ? `<span class="inline-block w-2 h-2 rounded-full bg-red-500 animate-pulse mr-1"></span>` : "";
+      return `
+      <div class="border rounded-lg p-2.5 hover:border-red-300 transition cursor-pointer ${busyBorder}"
+           onclick="focusVehicle('${v.vehicle_id}')">
+        <div class="flex justify-between items-center mb-1">
+          <span class="font-semibold text-gray-800 text-xs">${busyDot}${icon} ${v.vehicle_name || v.vehicle_id}</span>
+          <span class="text-xs px-1.5 py-0.5 rounded-full font-semibold ${st.cls}">${st.label}</span>
+        </div>
+        <p class="text-xs text-gray-400 font-mono">${pos ? pos.lat.toFixed(4)+', '+pos.lng.toFixed(4) : '—'}</p>
+      </div>`;
+    }).join("");
+  }
+
+  if (simEl) {
+    const cur = simEl.value;
+    simEl.innerHTML = `<option value="">— All vehicles —</option>` +
+      vehicles.map(v => `<option value="${v.vehicle_id}" ${cur===v.vehicle_id?'selected':''}>${vehicleIcons[v.vehicle_type]||"🚗"} ${v.vehicle_name || v.vehicle_id}</option>`).join("");
+  }
+}
+
+function focusVehicle(vehicleId) {
+  const pos = vehiclePositions[vehicleId];
+  if (pos && trackingMap) trackingMap.setView([pos.lat, pos.lng], 15);
+  if (trackingMarkers[vehicleId]) trackingMarkers[vehicleId].openPopup();
+}
+
+// ── WebSocket — animated live updates ──────────────────────
+function connectWebSocket() {
+  try {
+    ws = new WebSocket("ws://localhost:3003");
+    ws.onopen = () => {
+      document.getElementById("ws-status").className = "w-3 h-3 rounded-full bg-green-500 inline-block animate-pulse";
+      document.getElementById("ws-label").textContent = "Live";
+    };
+    ws.onmessage = e => {
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.type === "location_update" && msg.vehicle) {
+          const v = msg.vehicle;
+          const lat = parseFloat(v.latitude), lng = parseFloat(v.longitude);
+          if (isNaN(lat) || isNaN(lng)) return;
+          vehicleData[v.vehicle_id] = v;
+          if (trackingMarkers[v.vehicle_id]) {
+            animateMarkerTo(v.vehicle_id, lat, lng);
+          } else if (trackingMap) {
+            renderVehicles([v]);
+          }
+          addSimLog(v.vehicle_id, lat, lng, "ws");
+          // Refresh vehicle list sidebar
+          renderVehicleList(Object.values(vehicleData));
+        }
+      } catch {}
+    };
+    ws.onclose = () => {
+      document.getElementById("ws-status").className = "w-3 h-3 rounded-full bg-red-400 inline-block";
+      document.getElementById("ws-label").textContent = "Reconnecting…";
+      setTimeout(connectWebSocket, 4000);
+    };
+    ws.onerror = () => ws.close();
+  } catch {}
+}
+
+// ── Single-step GPS simulate ────────────────────────────────
+async function simulateGPS() {
+  const selectedId = document.getElementById("sim-vehicle").value;
+  const ids = selectedId
+    ? [selectedId]
+    : Object.keys(vehicleData).length
+      ? Object.keys(vehicleData)
+      : [];
+
+  if (!ids.length) {
+    alert("No vehicles available. Register a vehicle in Management first.");
+    return;
+  }
+  await sendSimUpdates(ids);
+}
+
+// ── Auto-simulate loop ──────────────────────────────────────
+function toggleAutoSim() {
+  autoSimRunning ? stopAutoSim() : startAutoSim();
+}
+
+function startAutoSim() {
+  if (autoSimRunning) return;
+  // Need vehicles to be loaded first
+  if (!Object.keys(vehicleData).length) {
+    loadVehicles().then(() => {
+      if (!Object.keys(vehicleData).length) {
+        alert("No vehicles registered. Add vehicles in Management first.");
+        return;
+      }
+      _doStartAutoSim();
+    });
+    return;
+  }
+  _doStartAutoSim();
+}
+
+function _doStartAutoSim() {
+  autoSimRunning = true;
+  const btn = document.getElementById("auto-sim-btn");
+  if (btn) { btn.textContent = "⏹ Stop Auto-Simulate"; btn.classList.replace("bg-green-600","bg-red-600"); btn.classList.replace("hover:bg-green-700","hover:bg-red-700"); }
+  const statusEl = document.getElementById("auto-sim-status");
+  if (statusEl) { statusEl.textContent = "Running ✓"; statusEl.style.color = "#16a34a"; }
+
+  // Always run at 300ms during active dispatch for smooth visible movement
+  const speed = 300;
+  // Immediate first step then regular interval
+  runAutoSimStep();
+  autoSimInterval = setInterval(runAutoSimStep, speed);
+}
+
+function stopAutoSim() {
+  autoSimRunning = false;
+  if (autoSimInterval) { clearInterval(autoSimInterval); autoSimInterval = null; }
+  const btn = document.getElementById("auto-sim-btn");
+  if (btn) { btn.textContent = "▶ Start Auto-Simulate"; btn.classList.replace("bg-red-600","bg-green-600"); btn.classList.replace("hover:bg-red-700","hover:bg-green-700"); }
+  const statusEl2 = document.getElementById("auto-sim-status");
+  if (statusEl2) { statusEl2.textContent = "Idle"; statusEl2.style.color = ""; }
+}
+
+async function runAutoSimStep() {
+  // Only process vehicles with an active (non-arrived) dispatch route
+  const activeIds = Object.keys(dispatchRoutes).filter(vid => !dispatchRoutes[vid].arrived);
+
+  if (activeIds.length === 0) {
+    // No more active dispatches — stop the loop automatically
+    stopAutoSim();
+    return;
+  }
+  await sendSimUpdates(activeIds);
+}
+
+// ── Core: move only dispatched vehicles toward their incident ──
+async function sendSimUpdates(vehicleIds) {
+  for (const id of vehicleIds) {
+    const route = dispatchRoutes[id];
+    if (!route || route.arrived) continue;  // skip idle / already resolved
+
+    const cur = vehiclePositions[id] || { lat: route.startLat, lng: route.startLng };
+
+    // Time-based interpolation — progress driven by real elapsed time
+    const elapsed  = Date.now() - (route.startTime || Date.now());
+    const rawProg  = Math.min(1, elapsed / (route.travelMs || 60000));
+    const progress = rawProg < 0.5
+      ? 2 * rawProg * rawProg
+      : 1 - Math.pow(-2 * rawProg + 2, 2) / 2;
+
+    const sLat = route.startLat ?? cur.lat;
+    const sLng = route.startLng ?? cur.lng;
+
+    let newLat, newLng, newStatus;
+
+    if (rawProg >= 1) {
+      // Arrived — snap to incident location
+      newLat = route.targetLat;
+      newLng = route.targetLng;
+      newStatus = "on_scene";
+    } else {
+      // Moving along the route with slight jitter for realism
+      newLat = sLat + (route.targetLat - sLat) * progress + (Math.random() - 0.5) * 0.0002;
+      newLng = sLng + (route.targetLng - sLng) * progress + (Math.random() - 0.5) * 0.0002;
+      newStatus = route.inProgress ? "in_progress" : "dispatched";
+
+      // 2% into journey → flip to "in progress"
+      if (!route.inProgress && rawProg > 0.02) {
+        route.inProgress = true;
+        newStatus = "in_progress";
+        fetch(`${API.incident}/incidents/${route.incidentId}/status`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ status: "in_progress" }),
+        }).catch(() => {});
+        loadIncidents();
+      }
+    }
+
+    try {
+      // Push new position to dispatch DB
+      await fetch(`${API.dispatch}/vehicles/${id}/location`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ latitude: newLat, longitude: newLng, status: newStatus }),
+      });
+
+      // Keep local state in sync
+      vehicleData[id] = { ...(vehicleData[id] || {}), latitude: newLat, longitude: newLng, status: newStatus };
+      vehiclePositions[id] = { lat: newLat, lng: newLng };
+
+      // Animate the marker on the map
+      if (trackingMarkers[id]) {
+        animateMarkerTo(id, newLat, newLng);
+        // Refresh popup content with new status
+        trackingMarkers[id].setPopupContent(buildVehiclePopup(id, newLat, newLng));
+      } else if (trackingMap) {
+        renderVehicles([vehicleData[id]]);
+      }
+
+      // Slide the route line to follow the vehicle
+      updateRouteLine(id, newLat, newLng);
+
+      // Trigger arrival / resolved when vehicle reaches the incident
+      await checkArrival(id, newLat, newLng);
+
+      addSimLog(id, newLat, newLng, "sim");
+      simCount++;
+      const el = document.getElementById("sim-count");
+      if (el) el.textContent = simCount;
+    } catch (err) {
+      console.error("Sim update failed for", id, err);
+    }
+  }
+  renderVehicleList(Object.values(vehicleData));
+}
+
+// ── Simulation update log ───────────────────────────────────
+function addSimLog(vehicleId, lat, lng, source) {
+  const vd = vehicleData[vehicleId] || {};
+  const icon = vehicleIcons[vd.vehicle_type] || "🚗";
+  const name = vd.vehicle_name || vehicleId;
+  const time = new Date().toLocaleTimeString("en-GB");
+  const srcBadge = source === "ws"
+    ? `<span style="background:#dcfce7;color:#166534;padding:1px 5px;border-radius:4px;font-size:10px">WS</span>`
+    : `<span style="background:#dbeafe;color:#1e40af;padding:1px 5px;border-radius:4px;font-size:10px">SIM</span>`;
+
+  simLog.unshift({ icon, name, lat, lng, time, srcBadge });
+  if (simLog.length > 12) simLog.pop();
+
+  const el = document.getElementById("sim-log");
+  if (!el) return;
+  el.innerHTML = simLog.map(e => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:3px 6px;border-bottom:1px solid #f1f5f9;font-size:11px">
+      <span>${e.icon} <strong>${e.name}</strong> ${e.srcBadge}</span>
+      <span style="color:#3b82f6;font-family:monospace">${parseFloat(e.lat).toFixed(4)}, ${parseFloat(e.lng).toFixed(4)}</span>
+      <span style="color:#9ca3af">${e.time}</span>
+    </div>`).join("");
+}
+
+function clearSimLog() {
+  simLog = [];
+  const el = document.getElementById("sim-log");
+  if (el) el.innerHTML = `<p class="text-gray-400 text-xs text-center py-3">Log cleared</p>`;
+}
+
+// ══════════════════════════════════════════════════════════
+//   INCIDENT OVERLAY ON TRACKING MAP
+// ══════════════════════════════════════════════════════════
+
+async function loadIncidentsOverlay() {
+  if (!trackingMap) return;
+  try {
+    const res = await fetch(`${API.incident}/incidents/open`,
+      { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) return;
+    const incidents = await res.json();
+
+    // Clear old markers
+    Object.values(incidentOverlayMarkers).forEach(m => m.remove());
+    incidentOverlayMarkers = {};
+
+    incidents
+      .filter(i => ["created", "dispatched", "in_progress"].includes(i.status))
+      .forEach(inc => {
+        const lat = parseFloat(inc.latitude), lng = parseFloat(inc.longitude);
+        if (isNaN(lat) || isNaN(lng)) return;
+
+        addIncidentOverlayMarker(inc, lat, lng);
+
+        // Route the correct vehicle toward this incident
+        if (inc.status === "dispatched" || inc.status === "in_progress") {
+          const alreadyRouted = Object.values(dispatchRoutes).some(r => r.incidentId === inc._id && !r.arrived);
+          if (!alreadyRouted) {
+            const vid = inc.assigned_vehicle_id;
+            if (vid && vehicleData[vid] && !dispatchRoutes[vid]?.arrived) {
+              // Use the vehicle the backend actually assigned
+              const pos = vehiclePositions[vid] || { lat, lng };
+              const dist = haversineKm(pos.lat, pos.lng, lat, lng);
+              const travelMs = Math.max(15000, Math.min(600000, dist * 1500));
+              dispatchRoutes[vid] = {
+                incidentId: inc._id, targetLat: lat, targetLng: lng,
+                startLat: pos.lat, startLng: pos.lng,
+                arrived: false, inProgress: inc.status === "in_progress",
+                incidentType: inc.incident_type, startTime: Date.now(), travelMs
+              };
+              drawRouteLine(vid);
+              setVehicleHighlight(vid);
+              if (!autoSimRunning) startAutoSim();
+              setTimeout(async () => {
+                const r = dispatchRoutes[vid];
+                if (r && !r.arrived) await checkArrival(vid, lat, lng);
+              }, travelMs + 5000);
+            } else {
+              // Fallback: find nearest unassigned vehicle
+              assignNearestVehicle(inc, lat, lng);
+            }
+          } else if (alreadyRouted) {
+            // Route already set — ensure highlight is applied (e.g. after tab switch)
+            const vid = Object.keys(dispatchRoutes).find(k => dispatchRoutes[k].incidentId === inc._id && !dispatchRoutes[k].arrived);
+            if (vid && !activeDispatchVehicle) setVehicleHighlight(vid);
+          }
+        }
+      });
+  } catch {}
+}
+
+function addIncidentOverlayMarker(inc, lat, lng) {
+  const typeEmoji = {
+    "Medical Emergency":"🏥","Fire Outbreak":"🔥","Robbery":"🔫",
+    "Road Accident":"🚧","Crime":"👮","Explosion":"💥","Flood":"🌊","Other":"⚠️"
+  }[inc.incident_type] || "🚨";
+  const statusColor = inc.status === "resolved" ? "#16a34a" : inc.status === "in_progress" ? "#d97706" : "#dc2626";
+  const responder = Array.isArray(inc.responder) ? inc.responder[0] : inc.responder;
+
+  const marker = L.marker([lat, lng], { icon: buildIncidentBeaconIcon(inc), zIndexOffset: 1000 })
+    .addTo(trackingMap)
+    .bindPopup(`<div style="min-width:190px;font-family:sans-serif">
+      <p style="font-weight:700;font-size:14px;margin:0 0 6px">${typeEmoji} ${inc.incident_type}</p>
+      <p style="font-size:12px;margin:2px 0;color:#374151">👤 Reporter: <strong>${inc.citizen_name}</strong></p>
+      <p style="font-size:12px;margin:2px 0;color:#374151">📌 Status: <strong style="color:${statusColor}">${inc.status.replace(/_/g," ")}</strong></p>
+      ${responder ? `<p style="font-size:12px;margin:2px 0;color:#374151">🚒 Unit: <strong>${responder.name}</strong></p>` : ""}
+      ${inc.assigned_vehicle_id ? `<p style="font-size:12px;margin:2px 0;color:#374151">🚗 Vehicle: <strong>${inc.assigned_vehicle_id}</strong></p>` : ""}
+      ${inc.notes ? `<p style="font-size:11px;margin:6px 0 0;color:#6b7280;font-style:italic">${inc.notes}</p>` : ""}
+    </div>`);
+
+  incidentOverlayMarkers[inc._id] = marker;
+}
+
+function assignNearestVehicle(inc, incLat, incLng) {
+  const responder  = Array.isArray(inc.responder) ? inc.responder[0] : inc.responder;
+  const neededType = responder?.type || null;
+
+  let bestId = null, bestDist = Infinity;
+
+  for (const [vid, v] of Object.entries(vehicleData)) {
+    if (neededType && v.vehicle_type !== neededType) continue;
+    // Skip vehicles already routed to a non-arrived incident
+    const busy = Object.entries(dispatchRoutes).some(([rid, r]) => rid === vid && !r.arrived);
+    if (busy) continue;
+    const pos = vehiclePositions[vid];
+    if (!pos) continue;
+    const d = haversineKm(pos.lat, pos.lng, incLat, incLng);
+    if (d < bestDist) { bestDist = d; bestId = vid; }
+  }
+
+  if (!bestId) return;
+
+  const startPos = vehiclePositions[bestId] || { lat: incLat, lng: incLng };
+  // Travel time: 1500 ms per km — nearby fast, cross-country up to 10 min
+  const travelMs = Math.max(15000, Math.min(600000, bestDist * 1500));
+
+  dispatchRoutes[bestId] = {
+    incidentId:   inc._id,
+    targetLat:    incLat,   targetLng:  incLng,
+    startLat:     startPos.lat, startLng: startPos.lng,
+    arrived:      false,
+    inProgress:   false,
+    incidentType: inc.incident_type,
+    startTime:    Date.now(),
+    travelMs
+  };
+
+  drawRouteLine(bestId);
+  setVehicleHighlight(bestId);   // highlight + dim others
+
+  // Auto-start simulation so the vehicle moves immediately
+  if (!autoSimRunning) startAutoSim();
+
+  // Hard fallback: force-resolve at deadline even if sim never ran
+  setTimeout(async () => {
+    const r = dispatchRoutes[bestId];
+    if (r && !r.arrived) await checkArrival(bestId, incLat, incLng);
+  }, travelMs + 5000);
+}
+
+function drawRouteLine(vehicleId) {
+  if (!trackingMap) return;
+  const pos   = vehiclePositions[vehicleId];
+  const route = dispatchRoutes[vehicleId];
+  if (!pos || !route) return;
+
+  // Remove old lines
+  if (routeLines[vehicleId])    { routeLines[vehicleId].remove();    delete routeLines[vehicleId]; }
+  if (routeBackLines[vehicleId]){ routeBackLines[vehicleId].remove(); delete routeBackLines[vehicleId]; }
+
+  const coords = [[pos.lat, pos.lng], [route.targetLat, route.targetLng]];
+  const isActive = vehicleId === activeDispatchVehicle;
+
+  if (isActive) {
+    // Background glow track (thick, translucent)
+    routeBackLines[vehicleId] = L.polyline(coords, {
+      color: "#ef4444", weight: 14, opacity: 0.13, lineCap: "round"
+    }).addTo(trackingMap);
+    // Bright animated dash line on top
+    routeLines[vehicleId] = L.polyline(coords, {
+      color: "#ef4444", weight: 5, opacity: 0.95, dashArray: "14 7",
+      dashOffset: "0", lineCap: "round"
+    }).addTo(trackingMap);
+    // Start/restart dash animation
+    startRouteLineAnimation(vehicleId);
+  } else {
+    routeLines[vehicleId] = L.polyline(coords, {
+      color: "#dc2626", weight: 2, opacity: 0.5, dashArray: "8 5"
+    }).addTo(trackingMap);
+  }
+}
+
+function updateRouteLine(vehicleId, curLat, curLng) {
+  const route = dispatchRoutes[vehicleId];
+  if (!route || route.arrived) {
+    if (routeLines[vehicleId])     { routeLines[vehicleId].remove();     delete routeLines[vehicleId]; }
+    if (routeBackLines[vehicleId]) { routeBackLines[vehicleId].remove();  delete routeBackLines[vehicleId]; }
+    return;
+  }
+  const coords = [[curLat, curLng], [route.targetLat, route.targetLng]];
+  if (routeLines[vehicleId]) {
+    routeLines[vehicleId].setLatLngs(coords);
+    if (routeBackLines[vehicleId]) routeBackLines[vehicleId].setLatLngs(coords);
+  } else {
+    drawRouteLine(vehicleId);
+  }
+}
+
+async function checkArrival(vehicleId, lat, lng) {
+  const route = dispatchRoutes[vehicleId];
+  if (!route || route.arrived) return;
+
+  const dist    = haversineKm(lat, lng, route.targetLat, route.targetLng);
+  const elapsed = Date.now() - (route.startTime || 0);
+  const timeUp  = elapsed >= (route.travelMs || 600000);
+  if (dist > ARRIVAL_KM && !timeUp) return;
+
+  // Mark arrived immediately to prevent double-trigger
+  route.arrived = true;
+
+  // Update incident status → resolved on arrival
+  try {
+    await fetch(`${API.incident}/incidents/${route.incidentId}/status`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ status: "resolved" }),
+    });
+  } catch {}
+
+  // Update vehicle status → on_scene
+  try {
+    await fetch(`${API.dispatch}/vehicles/${vehicleId}/location`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ latitude: lat, longitude: lng, status: "on_scene" }),
+    });
+    vehicleData[vehicleId] = { ...(vehicleData[vehicleId] || {}), status: "on_scene" };
+  } catch {}
+
+  // Remove route lines
+  if (routeLines[vehicleId])     { routeLines[vehicleId].remove();     delete routeLines[vehicleId]; }
+  if (routeBackLines[vehicleId]) { routeBackLines[vehicleId].remove();  delete routeBackLines[vehicleId]; }
+
+  // Update incident marker to resolved beacon
+  const m = incidentOverlayMarkers[route.incidentId];
+  if (m) {
+    m.setIcon(buildIncidentBeaconIcon({ incident_type: route.incidentType, status: "resolved" }));
+  }
+
+  // Restore vehicle highlight state (dims cleared, all normal)
+  clearVehicleHighlight(vehicleId);
+
+  // Arrival toast-banner
+  showArrivalBanner(vehicleId, route.incidentType);
+
+  // Refresh incidents list if visible
+  loadIncidents();
+}
+
+function showArrivalBanner(vehicleId, incidentType) {
+  const vd   = vehicleData[vehicleId] || {};
+  const icon = vehicleIcons[vd.vehicle_type] || "🚗";
+  const name = vd.vehicle_name || vehicleId;
+
+  const banner = document.createElement("div");
+  banner.style.cssText = "position:fixed;top:24px;left:50%;transform:translateX(-50%);background:#16a34a;color:#fff;padding:14px 28px;border-radius:14px;font-weight:700;font-size:14px;z-index:9999;box-shadow:0 6px 24px rgba(0,0,0,.25);display:flex;align-items:center;gap:10px";
+  banner.innerHTML = `<span style="font-size:20px">${icon}</span> ${name} arrived on scene — <em>${incidentType}</em> is now <strong>Resolved ✓</strong>`;
+  document.body.appendChild(banner);
+  setTimeout(() => banner.style.opacity = "0", 3500);
+  setTimeout(() => banner.remove(), 4000);
+}
+
+// ══════════════════════════════════════════════════════════
+//   ANALYTICS
+// ══════════════════════════════════════════════════════════
+
+async function loadAnalytics() {
+  const el = document.getElementById("analytics-content");
+  try {
+    const [rtRes, regionRes, resourceRes] = await Promise.all([
+      fetch(`${API.analytics}/analytics/response-times`,     { headers: { Authorization: `Bearer ${token}` } }),
+      fetch(`${API.analytics}/analytics/incidents-by-region`,{ headers: { Authorization: `Bearer ${token}` } }),
+      fetch(`${API.analytics}/analytics/resource-utilization`,{headers: { Authorization: `Bearer ${token}` } }),
+    ]);
+    const rt       = await rtRes.json();
+    const region   = await regionRes.json();
+    const resource = await resourceRes.json();
+
+    el.innerHTML = `
+      <!-- Key Metrics -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div class="card text-center animate-slideIn" style="animation-delay: 0s">
+          <p class="text-4xl font-bold text-red-600">${region.total || 0}</p>
+          <p class="text-gray-600 text-sm mt-2">Total Incidents</p>
+        </div>
+        <div class="card text-center animate-slideIn" style="animation-delay: 0.1s">
+          <p class="text-4xl font-bold text-blue-600">${rt.average_response_minutes && rt.average_response_minutes !== 'N/A' 
+            ? Math.round(parseFloat(rt.average_response_minutes)) 
+            : '—'}</p>
+          <p class="text-gray-600 text-sm mt-2">Avg Response Time (min)</p>
+        </div>
+        <div class="card text-center animate-slideIn" style="animation-delay: 0.2s">
+          <p class="text-4xl font-bold text-green-600">${Math.round(resource.utilization_pct || 0)}%</p>
+          <p class="text-gray-600 text-sm mt-2">Resource Utilization</p>
+        </div>
+        <div class="card text-center animate-slideIn" style="animation-delay: 0.3s">
+          <p class="text-4xl font-bold text-purple-600">${resource.active_vehicles || 0}</p>
+          <p class="text-gray-600 text-sm mt-2">Active Vehicles</p>
+        </div>
+      </div>
+
+      <!-- Detailed Analytics -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <!-- Incidents by Type -->
+        <div class="card">
+          <h3 class="font-bold text-gray-800 mb-4 text-lg">📊 Incidents by Type</h3>
+          ${Object.entries(region.by_type || {}).length
+            ? Object.entries(region.by_type).map(([type, count]) => `
+              <div class="flex justify-between items-center py-2.5 border-b border-gray-100 last:border-0">
+                <span class="text-gray-700">${type}</span>
+                <span class="inline-block bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-bold">${count}</span>
+              </div>`).join("")
+            : "<p class='text-gray-400 text-sm py-4'>No incidents recorded yet</p>"}
+        </div>
+
+        <!-- Incidents by Status -->
+        <div class="card">
+          <h3 class="font-bold text-gray-800 mb-4 text-lg">📈 Incidents by Status</h3>
+          ${Object.entries(region.by_status || {}).length
+            ? Object.entries(region.by_status).map(([status, count]) => {
+              const statusColors = {
+                created: 'yellow',
+                dispatched: 'blue',
+                in_progress: 'green',
+                resolved: 'gray'
+              };
+              const color = statusColors[status] || 'gray';
+              return `
+              <div class="flex justify-between items-center py-2.5 border-b border-gray-100 last:border-0">
+                <span class="status-badge status-${status}">${status.replace(/_/g, ' ')}</span>
+                <span class="font-bold text-gray-800">${count}</span>
+              </div>`;
+            }).join("")
+            : "<p class='text-gray-400 text-sm py-4'>No data available</p>"}
+        </div>
+
+        <!-- Responder Status -->
+        <div class="card">
+          <h3 class="font-bold text-gray-800 mb-4 text-lg">🚑 Responder Status</h3>
+          ${Object.entries(resource.by_type || {}).length
+            ? Object.entries(resource.by_type).map(([type, d]) => `
+              <div class="py-3 border-b border-gray-100 last:border-0">
+                <div class="flex justify-between items-center mb-2">
+                  <span class="font-semibold text-gray-700 capitalize">${type}</span>
+                  <span class="text-sm">
+                    <span class="text-green-600 font-bold">${d.available}</span>
+                    <span class="text-gray-400">/ ${d.total}</span>
+                  </span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                  <div class="bg-green-500 h-2.5 rounded-full transition-all" 
+                    style="width: ${Math.round((d.available / d.total) * 100)}%"></div>
+                </div>
+              </div>`).join("")
+            : "<p class='text-gray-400 text-sm py-4'>No responders configured</p>"}
+        </div>
+
+        <!-- Deployment Rate -->
+        <div class="card">
+          <h3 class="font-bold text-gray-800 mb-4 text-lg">📍 Deployment Rate</h3>
+          <div class="text-center py-4">
+            <div class="text-5xl font-bold text-red-600 mb-2">${Math.round(resource.utilization_pct || 0)}%</div>
+            <p class="text-gray-600 text-sm mb-4">of available units deployed</p>
+            <div class="flex justify-between text-xs text-gray-600 mb-2">
+              <span>Idle</span><span>${Math.round(100 - (resource.utilization_pct || 0))}%</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+              <div class="bg-red-500 h-full transition-all" 
+                style="width: ${Math.round(resource.utilization_pct || 0)}%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- System Status -->
+      <div class="card bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200">
+        <h3 class="font-bold text-gray-800 mb-3">💻 System Status</h3>
+        <div class="grid grid-cols-3 gap-4 text-center">
+          <div>
+            <p class="text-sm text-gray-600">WebSocket</p>
+            <p id="ws-status-text"class="text-lg font-bold text-green-600">🟢 Connected</p>
+          </div>
+          <div>
+            <p class="text-sm text-gray-600">Database</p>
+            <p class="text-lg font-bold text-green-600">🟢 Healthy</p>
+          </div>
+          <div>
+            <p class="text-sm text-gray-600">APIs</p>
+            <p class="text-lg font-bold text-green-600">🟢 Online</p>
+          </div>
+        </div>
+      </div>
+    `;
+  } catch (err) {
+    el.innerHTML = `<div class="bg-red-50 border border-red-200 rounded-lg p-6 text-red-700">
+      <p class="font-bold">⚠️ Failed to load analytics</p>
+      <p class="text-sm mt-2">${err.message}</p>
+    </div>`;
+  }
+}
+</script>
+</body>
+</html>

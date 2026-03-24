@@ -12,8 +12,8 @@ app.use(express.json());
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 const JWT_SECRET = process.env.JWT_SECRET;
-const INCIDENT_URL = process.env.INCIDENT_SERVICE_URL || "http://localhost:3002";
-const DISPATCH_URL  = process.env.DISPATCH_SERVICE_URL  || "http://localhost:3003";
+const INCIDENT_URL = process.env.INCIDENT_SERVICE_URL || "http://incident-service:3002";
+const DISPATCH_URL  = process.env.DISPATCH_SERVICE_URL  || "http://dispatch-service:3003";
 
 const authenticate = (req, res, next) => {
   const auth = req.headers.authorization;

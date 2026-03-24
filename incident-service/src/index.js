@@ -2,6 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
+const axios = require("axios");
 const { ObjectId } = require("mongodb");
 const swaggerUi = require("swagger-ui-express");
 const swaggerDocument = require("./swagger");
@@ -14,6 +15,7 @@ app.use(express.json());
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 const JWT_SECRET = process.env.JWT_SECRET;
+const DISPATCH_URL = process.env.DISPATCH_SERVICE_URL || "http://dispatch-service:3003";
 
 // ── Auth middleware ───────────────────────────────────────
 const authenticate = (req, res, next) => {
@@ -135,6 +137,40 @@ app.post("/incidents", authenticate, async (req, res) => {
       incident.assigned_unit = nearest._id;
       incident.status = "dispatched";
       incident.responder = nearest;
+
+      // Link nearest dispatch vehicle so frontend tracking map can route it
+      try {
+        const vehiclesRes = await axios.get(`${DISPATCH_URL}/vehicles`, {
+          headers: { Authorization: req.headers.authorization }
+        });
+        const vehicles = vehiclesRes.data;
+        const typeMap = { police: "police", fire: "fire", ambulance: "ambulance" };
+        const matching = vehicles.filter(v =>
+          v.vehicle_type === typeMap[responderType] && (v.status === "idle" || !v.status)
+        );
+        if (matching.length > 0) {
+          const nearestVehicle = matching.reduce((best, v) => {
+            const d = getDistance(
+              parseFloat(latitude), parseFloat(longitude),
+              parseFloat(v.latitude) || 0, parseFloat(v.longitude) || 0
+            );
+            const bd = best
+              ? getDistance(parseFloat(latitude), parseFloat(longitude),
+                  parseFloat(best.latitude) || 0, parseFloat(best.longitude) || 0)
+              : Infinity;
+            return d < bd ? v : best;
+          }, null);
+          if (nearestVehicle) {
+            await axios.post(`${DISPATCH_URL}/vehicles/assign`, {
+              vehicle_id: nearestVehicle.vehicle_id,
+              incident_id: incident._id.toString()
+            });
+            incident.assigned_vehicle_id = nearestVehicle.vehicle_id;
+          }
+        }
+      } catch (vehicleErr) {
+        console.warn("⚠ Could not link dispatch vehicle:", vehicleErr.message);
+      }
     }
 
     // Publish event to message queue
@@ -378,6 +414,48 @@ app.put("/incidents/:id/assign", authenticate, async (req, res) => {
     }, 'incidents');
 
     res.json(incident);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── DELETE /incidents/:id ─────────────────────────────────
+app.delete("/incidents/:id", authenticate, async (req, res) => {
+  try {
+    const db = getDB();
+    const incident = await db.collection("incidents").findOne({ _id: new ObjectId(req.params.id) });
+    if (!incident) return res.status(404).json({ error: "Incident not found" });
+
+    // Free up responder if assigned
+    if (incident.assigned_unit) {
+      await db.collection("responders").updateOne(
+        { _id: incident.assigned_unit },
+        { $set: { is_available: true } }
+      );
+    }
+
+    // Free up hospital bed if assigned
+    if (incident.hospital_id) {
+      await db.collection("hospitals").updateOne(
+        { _id: incident.hospital_id },
+        { $inc: { available_beds: 1 } }
+      );
+    }
+
+    // Delete the incident
+    const result = await db.collection("incidents").deleteOne({ _id: new ObjectId(req.params.id) });
+    
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: "Failed to delete incident" });
+    }
+
+    // Publish event
+    await publishEvent(EVENTS.INCIDENT_DELETED, {
+      incident_id: req.params.id,
+      incident_type: incident.incident_type
+    }, 'incidents');
+
+    res.json({ message: "Incident deleted successfully", incident_id: req.params.id });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

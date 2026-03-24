@@ -9,6 +9,7 @@ const EVENTS = {
   INCIDENT_CREATED: 'incident.created',
   INCIDENT_UPDATED: 'incident.updated',
   INCIDENT_ASSIGNED: 'incident.assigned',
+  INCIDENT_DELETED: 'incident.deleted',
   RESPONDER_ASSIGNED: 'responder.assigned',
   HOSPITAL_ASSIGNED: 'hospital.assigned'
 };

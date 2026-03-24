@@ -1,0 +1,13 @@
+{
+  "name": "emergency-client",
+  "version": "1.0.0",
+  "description": "Frontend for Ghana Emergency Platform",
+  "scripts": {
+    "start": "npx serve . -p 3000",
+    "dev": "npx serve . -p 3000 --cors"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "serve": "^14.2.1"
+  }
+}
