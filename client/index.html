@@ -15,7 +15,7 @@
   /* Maps */
   #map { height: 100%; min-height: 420px; border-radius: 0.75rem; }
   #tracking-map { height: calc(100vh - 250px); min-height: 480px; border-radius: 0.75rem; }
-  #map-picker { height: 400px; border-radius: 0.5rem; }
+  #map-picker { height: 300px; border-radius: 0.5rem; }
   
   /* Tab system */
   .tab-content { display: none; opacity: 0; transition: opacity 0.2s; }
@@ -242,40 +242,43 @@
 
 <!-- ── Shared Map Picker Modal ────────────────────────────── -->
 <div id="map-picker-modal" class="hidden">
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mx-4 overflow-hidden border border-gray-200">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mx-4 border border-gray-200 flex flex-col" style="max-height:90vh">
     <!-- Header -->
-    <div class="flex items-center justify-between px-6 py-5 bg-gradient-to-r from-red-50 to-orange-50 border-b border-gray-200">
+    <div class="flex items-center justify-between px-6 py-5 bg-gradient-to-r from-red-50 to-orange-50 border-b border-gray-200 flex-shrink-0">
       <div>
         <h3 class="font-bold text-gray-800 text-lg">📍 Select Location</h3>
         <p class="text-xs text-gray-500 mt-0.5">Search, click the map, or use GPS to set coordinates</p>
       </div>
       <button onclick="closeMapPicker()" class="text-gray-400 hover:text-gray-700 text-2xl leading-none">✕</button>
     </div>
-    <!-- Search bar -->
-    <div class="px-6 pt-5 pb-2">
-      <div class="loc-search-wrap">
-        <div class="flex gap-2">
-          <input id="picker-search" type="text" placeholder="Search a location in Ghana (e.g., Osu, Korle-Bu Hospital)..."
-            class="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition"
-            oninput="debouncedPickerSearch(this.value)"
-            onkeydown="if(event.key==='Escape') document.getElementById('picker-results').classList.add('hidden')"/>
-          <button onclick="useGpsForPicker()" title="Use your current location"
-            class="flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-700 px-4 py-2.5 rounded-lg text-sm font-semibold transition whitespace-nowrap">
-            📍 My GPS
-          </button>
+    <!-- Scrollable body: search + map + selected display -->
+    <div class="overflow-y-auto flex-1 min-h-0">
+      <!-- Search bar -->
+      <div class="px-6 pt-5 pb-2">
+        <div class="loc-search-wrap">
+          <div class="flex gap-2">
+            <input id="picker-search" type="text" placeholder="Search a location in Ghana (e.g., Osu, Korle-Bu Hospital)..."
+              class="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition"
+              oninput="debouncedPickerSearch(this.value)"
+              onkeydown="if(event.key==='Escape') document.getElementById('picker-results').classList.add('hidden')"/>
+            <button onclick="useGpsForPicker()" title="Use your current location"
+              class="flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-700 px-4 py-2.5 rounded-lg text-sm font-semibold transition whitespace-nowrap">
+              📍 My GPS
+            </button>
+          </div>
+          <div id="picker-results" class="loc-results hidden"></div>
         </div>
-        <div id="picker-results" class="loc-results hidden"></div>
       </div>
+      <!-- Map -->
+      <div class="px-6 pb-2 mt-2">
+        <div id="map-picker" class="rounded-xl border border-gray-300 overflow-hidden shadow"></div>
+        <p class="text-xs text-gray-500 mt-2 text-center">Click anywhere on the map to place a pin</p>
+      </div>
+      <!-- Selected location display -->
+      <div id="picker-selected-display" class="hidden mx-6 my-3 loc-pill"><span id="picker-selected-text"></span></div>
     </div>
-    <!-- Map -->
-    <div class="px-6 pb-2 mt-2">
-      <div id="map-picker" class="rounded-xl border border-gray-300 overflow-hidden shadow"></div>
-      <p class="text-xs text-gray-500 mt-2 text-center">Click anywhere on the map to place a pin</p>
-    </div>
-    <!-- Selected location display -->
-    <div id="picker-selected-display" class="hidden mx-6 my-3 loc-pill"><span id="picker-selected-text"></span></div>
-    <!-- Footer -->
-    <div class="flex gap-3 justify-end px-6 py-4 bg-gray-50 border-t border-gray-200">
+    <!-- Footer — always visible at the bottom -->
+    <div class="flex gap-3 justify-end px-6 py-4 bg-gray-50 border-t border-gray-200 flex-shrink-0">
       <button onclick="closeMapPicker()"
         class="px-5 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition">
         Cancel
@@ -2471,6 +2474,19 @@ async function simulateGPS() {
     alert("No vehicles available. Register a vehicle in Management first.");
     return;
   }
+
+  // If no active dispatch routes in memory, try restoring from server first
+  const hasActive = ids.some(id => dispatchRoutes[id] && !dispatchRoutes[id].arrived);
+  if (!hasActive) {
+    await loadIncidentsOverlay();
+    const stillNone = ids.every(id => !dispatchRoutes[id] || dispatchRoutes[id].arrived);
+    if (stillNone) {
+      const statusEl = document.getElementById("auto-sim-status");
+      if (statusEl) { statusEl.textContent = "No active dispatches"; statusEl.style.color = "#f59e0b"; }
+      return;
+    }
+  }
+
   await sendSimUpdates(ids);
 }
 
@@ -2488,14 +2504,30 @@ function startAutoSim() {
         alert("No vehicles registered. Add vehicles in Management first.");
         return;
       }
-      _doStartAutoSim();
+      _startAfterRouteCheck();
     });
     return;
   }
-  _doStartAutoSim();
+  _startAfterRouteCheck();
+}
+
+// Try to restore dispatch routes from server before starting simulation
+function _startAfterRouteCheck() {
+  const active = Object.keys(dispatchRoutes).filter(vid => !dispatchRoutes[vid].arrived);
+  if (active.length) { _doStartAutoSim(); return; }
+  // No routes in memory — try to restore from the server
+  loadIncidentsOverlay().then(() => {
+    const restored = Object.keys(dispatchRoutes).filter(vid => !dispatchRoutes[vid].arrived);
+    if (!restored.length) {
+      const statusEl = document.getElementById("auto-sim-status");
+      if (statusEl) { statusEl.textContent = "No active dispatches"; statusEl.style.color = "#f59e0b"; }
+    }
+    // If loadIncidentsOverlay found routes it already called startAutoSim → _doStartAutoSim
+  });
 }
 
 function _doStartAutoSim() {
+  if (autoSimRunning) return;
   autoSimRunning = true;
   const btn = document.getElementById("auto-sim-btn");
   if (btn) { btn.textContent = "⏹ Stop Auto-Simulate"; btn.classList.replace("bg-green-600","bg-red-600"); btn.classList.replace("hover:bg-green-700","hover:bg-red-700"); }
