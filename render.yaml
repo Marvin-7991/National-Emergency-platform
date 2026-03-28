@@ -31,10 +31,7 @@ services:
       - key: RABBITMQ_URL
         sync: false   # Set in Render dashboard → use RABBITMQ_URL value from .env
       - key: DISPATCH_SERVICE_URL
-        fromService:
-          name: ner-dispatch-service
-          type: web
-          property: url
+        sync: false   # Set to: https://ner-dispatch-service.onrender.com
 
   # ── Dispatch Service ─────────────────────────────────────────
   - type: web
@@ -68,12 +65,6 @@ services:
       - key: RABBITMQ_URL
         sync: false
       - key: INCIDENT_SERVICE_URL
-        fromService:
-          name: ner-incident-service
-          type: web
-          property: url
+        sync: false   # Set to: https://ner-incident-service.onrender.com
       - key: DISPATCH_SERVICE_URL
-        fromService:
-          name: ner-dispatch-service
-          type: web
-          property: url
+        sync: false   # Set to: https://ner-dispatch-service.onrender.com
