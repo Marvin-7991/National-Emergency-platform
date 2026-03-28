@@ -896,9 +896,10 @@
   }
 </style>
 
+<script src="/config.js"></script>
 <script>
 // ── Config ─────────────────────────────────────────────────
-const API = {
+const API = window.ENV || {
   auth:     "http://localhost:3001",
   incident: "http://localhost:3002",
   dispatch: "http://localhost:3003",
@@ -2428,7 +2429,8 @@ function focusVehicle(vehicleId) {
 // ── WebSocket — animated live updates ──────────────────────
 function connectWebSocket() {
   try {
-    ws = new WebSocket("ws://localhost:3003");
+    const wsUrl = API.dispatch.replace(/^https?/, m => m === "https" ? "wss" : "ws");
+    ws = new WebSocket(wsUrl);
     ws.onopen = () => {
       document.getElementById("ws-status").className = "w-3 h-3 rounded-full bg-green-500 inline-block animate-pulse";
       document.getElementById("ws-label").textContent = "Live";

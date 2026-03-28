@@ -6,3 +6,10 @@
 *.log
 dist/
 build/
+/CLIENT_ENHANCEMENTS.md
+/COMPLETE_CHANGES_SUMMARY.md
+/COMPLETE_SETUP_GUIDE.md
+/QUICK_START.md
+/fix_errors.py
+/SETUP_GUIDE.md
+/update_client.py
