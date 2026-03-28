@@ -7,7 +7,7 @@
     },
     {
       "source": "/proxy/incident/:path*",
-      "destination": "https://national-emergency-platform-incident-api.onrender.com/:path*"
+      "destination": "https://national-emergency-platform-incident.onrender.com/:path*"
     },
     {
       "source": "/proxy/dispatch/:path*",
@@ -15,7 +15,7 @@
     },
     {
       "source": "/proxy/analytics/:path*",
-      "destination": "https://national-emergency-platform-analytics-api.onrender.com/:path*"
+      "destination": "https://national-emergency-platform-analytics.onrender.com/:path*"
     },
     {
       "source": "/(.*)",
