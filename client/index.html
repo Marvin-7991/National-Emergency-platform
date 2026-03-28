@@ -336,6 +336,12 @@
       <button onclick="showTab('manage-tab', this); loadManageTab()" class="sidebar-nav-btn w-full text-left" data-role="system_admin,hospital_admin,police_admin,fire_admin,ambulance_driver">
         <span class="text-lg mr-3"><i class="fa-solid fa-gear"></i></span>Management
       </button>
+      <button onclick="showTab('users-tab', this); loadUsers()" class="sidebar-nav-btn w-full text-left" data-role="system_admin">
+        <span class="text-lg mr-3"><i class="fa-solid fa-users"></i></span>Users
+      </button>
+      <button onclick="showTab('profile-tab', this); loadProfile()" class="sidebar-nav-btn w-full text-left" data-role="system_admin,hospital_admin,police_admin,fire_admin,ambulance_driver">
+        <span class="text-lg mr-3"><i class="fa-solid fa-circle-user"></i></span>My Profile
+      </button>
     </nav>
     <div class="p-4 border-t border-gray-700 space-y-2">
       <div id="sidebar-user" class="text-sm px-3 py-2 bg-gray-700 rounded-lg">
@@ -363,6 +369,8 @@
       <button onclick="showTab('tracking-tab', event.target); initTrackingMap(); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded hover:bg-red-600"><i class="fa-solid fa-map mr-2"></i>Live Tracking</button>
       <button onclick="showTab('analytics-tab', event.target); loadAnalytics(); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded hover:bg-red-600"><i class="fa-solid fa-chart-bar mr-2"></i>Analytics</button>
       <button onclick="showTab('manage-tab', event.target); loadManageTab(); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded hover:bg-red-600"><i class="fa-solid fa-gear mr-2"></i>Management</button>
+      <button onclick="showTab('users-tab', event.target); loadUsers(); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded hover:bg-red-600" data-role="system_admin"><i class="fa-solid fa-users mr-2"></i>Users</button>
+      <button onclick="showTab('profile-tab', event.target); loadProfile(); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded hover:bg-red-600"><i class="fa-solid fa-circle-user mr-2"></i>My Profile</button>
     </div>
     <div class="flex items-center justify-between text-xs">
       <div id="mobile-user">
@@ -864,6 +872,201 @@
         </div>
         <div id="analytics-content">
           <div class="text-center py-12 text-gray-400">Loading analytics...</div>
+        </div>
+      </div>
+
+      <!-- ── TAB 6: Users (system_admin only) ──────────────────── -->
+      <div id="users-tab" class="tab-content" style="display:none">
+        <div class="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h2 class="text-3xl font-bold text-gray-800"><i class="fa-solid fa-users"></i> User Management</h2>
+            <p class="text-gray-500 text-sm mt-1">Add, edit, or remove platform user accounts</p>
+          </div>
+          <button onclick="loadUsers()"
+            class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded-lg transition text-sm">
+            <i class="fa-solid fa-rotate"></i> Refresh
+          </button>
+        </div>
+
+        <!-- Add user form -->
+        <div class="card mb-6">
+          <h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fa-solid fa-user-plus"></i> Add New User</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-1">Full Name</label>
+              <input id="new-user-name" type="text" placeholder="e.g., Kwame Mensah"
+                class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"/>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-1">Email Address</label>
+              <input id="new-user-email" type="email" placeholder="e.g., kwame@example.com"
+                class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"/>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-1">Password</label>
+              <input id="new-user-password" type="password" placeholder="Minimum 6 characters"
+                class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"/>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-1">Role</label>
+              <select id="new-user-role"
+                class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
+                <option value="hospital_admin">🏥 Hospital Administrator</option>
+                <option value="police_admin">🚔 Police Administrator</option>
+                <option value="fire_admin">🚒 Fire Service Administrator</option>
+                <option value="ambulance_driver">🚑 Ambulance Driver</option>
+                <option value="system_admin">🔐 System Administrator</option>
+              </select>
+            </div>
+          </div>
+          <div id="add-user-msg" class="hidden mt-3 text-sm rounded-lg px-4 py-2"></div>
+          <div class="mt-4">
+            <button onclick="addUser()"
+              class="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-2.5 rounded-lg transition text-sm">
+              <i class="fa-solid fa-user-plus"></i> Create User
+            </button>
+          </div>
+        </div>
+
+        <!-- Users list -->
+        <div id="users-list" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div class="text-center py-12 text-gray-400 col-span-full">Loading users...</div>
+        </div>
+      </div>
+
+      <!-- ── Edit User Modal ─────────────────────────────────────── -->
+      <div id="edit-user-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onclick="if(event.target===this)closeEditUserModal()">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+          <div class="flex items-center justify-between p-6 border-b border-gray-200">
+            <h3 class="text-xl font-bold text-gray-800"><i class="fa-solid fa-user-pen"></i> Edit User</h3>
+            <button onclick="closeEditUserModal()" class="text-gray-400 hover:text-gray-600 text-xl"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+          <div class="p-6 space-y-4">
+            <input type="hidden" id="edit-user-id"/>
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-1">Full Name</label>
+              <input id="edit-user-name" type="text"
+                class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"/>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-1">Email Address</label>
+              <input id="edit-user-email" type="email"
+                class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"/>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-1">Role</label>
+              <select id="edit-user-role"
+                class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
+                <option value="hospital_admin">🏥 Hospital Administrator</option>
+                <option value="police_admin">🚔 Police Administrator</option>
+                <option value="fire_admin">🚒 Fire Service Administrator</option>
+                <option value="ambulance_driver">🚑 Ambulance Driver</option>
+                <option value="system_admin">🔐 System Administrator</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-1">New Password <span class="font-normal text-gray-400">(leave blank to keep unchanged)</span></label>
+              <input id="edit-user-password" type="password" placeholder="Enter new password"
+                class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"/>
+            </div>
+            <div id="edit-user-msg" class="hidden text-sm rounded-lg px-4 py-2"></div>
+          </div>
+          <div class="flex gap-3 px-6 pb-6">
+            <button onclick="closeEditUserModal()"
+              class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold py-2.5 rounded-lg transition text-sm">
+              Cancel
+            </button>
+            <button onclick="saveEditUser()"
+              class="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 rounded-lg transition text-sm">
+              <i class="fa-solid fa-floppy-disk"></i> Save Changes
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── TAB 7: My Profile ───────────────────────────────────── -->
+      <div id="profile-tab" class="tab-content" style="display:none">
+        <div class="mb-6">
+          <h2 class="text-3xl font-bold text-gray-800"><i class="fa-solid fa-circle-user"></i> My Profile</h2>
+          <p class="text-gray-500 text-sm mt-1">View and update your account details</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Profile info + edit -->
+          <div class="card">
+            <h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fa-solid fa-id-card"></i> Account Details</h3>
+
+            <!-- Avatar + role badge -->
+            <div class="flex items-center gap-4 mb-6 p-4 bg-gray-50 rounded-xl">
+              <div class="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center text-3xl text-red-600">
+                <i class="fa-solid fa-circle-user"></i>
+              </div>
+              <div>
+                <p id="profile-display-name" class="text-xl font-bold text-gray-800">—</p>
+                <p id="profile-display-email" class="text-sm text-gray-500">—</p>
+                <span id="profile-display-role" class="inline-block mt-1 px-3 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">—</span>
+              </div>
+            </div>
+
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1"><i class="fa-solid fa-user fa-fw"></i> Full Name</label>
+                <input id="profile-name" type="text"
+                  class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"/>
+              </div>
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1"><i class="fa-solid fa-envelope fa-fw"></i> Email Address</label>
+                <input id="profile-email" type="email"
+                  class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"/>
+              </div>
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1"><i class="fa-solid fa-shield-halved fa-fw"></i> Role</label>
+                <input id="profile-role" type="text" readonly
+                  class="w-full border border-gray-200 rounded-lg px-4 py-2 text-sm bg-gray-50 text-gray-500 cursor-not-allowed"/>
+              </div>
+              <div id="profile-info-msg" class="hidden text-sm rounded-lg px-4 py-2"></div>
+              <button onclick="saveProfileInfo()"
+                class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 rounded-lg transition text-sm">
+                <i class="fa-solid fa-floppy-disk"></i> Save Profile
+              </button>
+            </div>
+          </div>
+
+          <!-- Change password -->
+          <div class="card">
+            <h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fa-solid fa-lock"></i> Change Password</h3>
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">Current Password</label>
+                <input id="profile-current-password" type="password" placeholder="Enter your current password"
+                  class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"/>
+              </div>
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">New Password</label>
+                <input id="profile-new-password" type="password" placeholder="Minimum 6 characters"
+                  class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"/>
+              </div>
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">Confirm New Password</label>
+                <input id="profile-confirm-password" type="password" placeholder="Repeat new password"
+                  class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"/>
+              </div>
+              <div id="profile-pw-msg" class="hidden text-sm rounded-lg px-4 py-2"></div>
+              <button onclick="saveProfilePassword()"
+                class="w-full bg-gray-800 hover:bg-gray-900 text-white font-bold py-2.5 rounded-lg transition text-sm">
+                <i class="fa-solid fa-key"></i> Update Password
+              </button>
+            </div>
+
+            <!-- Account info card -->
+            <div class="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-100">
+              <p class="text-xs font-semibold text-blue-700 mb-2"><i class="fa-solid fa-circle-info"></i> Account Info</p>
+              <div class="space-y-1 text-xs text-blue-600">
+                <p><i class="fa-solid fa-calendar fa-fw"></i> Member since: <span id="profile-created-at">—</span></p>
+                <p><i class="fa-solid fa-fingerprint fa-fw"></i> User ID: <span id="profile-user-id" class="font-mono">—</span></p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -2904,6 +3107,272 @@ function showArrivalBanner(vehicleId, incidentType) {
 // ══════════════════════════════════════════════════════════
 //   ANALYTICS
 // ══════════════════════════════════════════════════════════
+
+// ══════════════════════════════════════════════════════════
+//   USERS TAB
+// ══════════════════════════════════════════════════════════
+
+const ROLE_LABELS = {
+  system_admin:    { label: "System Admin",      icon: "fa-lock",           color: "bg-purple-100 text-purple-700" },
+  hospital_admin:  { label: "Hospital Admin",    icon: "fa-hospital",       color: "bg-blue-100 text-blue-700" },
+  police_admin:    { label: "Police Admin",      icon: "fa-shield-halved",  color: "bg-indigo-100 text-indigo-700" },
+  fire_admin:      { label: "Fire Admin",        icon: "fa-fire-flame-curved", color: "bg-orange-100 text-orange-700" },
+  ambulance_driver:{ label: "Ambulance Driver",  icon: "fa-truck-medical",  color: "bg-green-100 text-green-700" },
+};
+
+async function loadUsers() {
+  const el = document.getElementById("users-list");
+  try {
+    const res = await apiFetch(`${API.auth}/auth/users`);
+    if (!res.ok) { el.innerHTML = `<p class="text-red-500 col-span-full text-center py-8">Failed to load users.</p>`; return; }
+    const users = await res.json();
+
+    if (!users.length) {
+      el.innerHTML = `<div class="col-span-full text-center py-12 text-gray-400">
+        <i class="fa-solid fa-users text-4xl mb-3"></i>
+        <p class="font-semibold">No users found</p>
+      </div>`;
+      return;
+    }
+
+    el.innerHTML = users.map(u => {
+      const r = ROLE_LABELS[u.role] || { label: u.role, icon: "fa-user", color: "bg-gray-100 text-gray-700" };
+      const joined = new Date(u.created_at).toLocaleDateString("en-GB", { day:"2-digit", month:"short", year:"numeric" });
+      const isSelf = u._id === user?.id;
+      return `
+      <div class="card hover:shadow-md transition">
+        <div class="flex items-start justify-between mb-3">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600">
+              <i class="fa-solid fa-circle-user text-xl"></i>
+            </div>
+            <div>
+              <p class="font-bold text-gray-800 text-sm">${u.name}${isSelf ? ' <span class="text-xs text-gray-400 font-normal">(you)</span>' : ''}</p>
+              <p class="text-xs text-gray-500">${u.email}</p>
+            </div>
+          </div>
+        </div>
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${r.color}">
+          <i class="fa-solid ${r.icon}"></i> ${r.label}
+        </span>
+        <p class="text-xs text-gray-400 mt-3"><i class="fa-regular fa-calendar fa-fw"></i> Joined ${joined}</p>
+        <div class="flex gap-2 mt-4 pt-3 border-t border-gray-100">
+          <button onclick="openEditUserModal('${u._id}','${u.name.replace(/'/g,"\\'")}','${u.email}','${u.role}')"
+            class="flex-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold text-xs py-2 rounded-lg transition">
+            <i class="fa-solid fa-pen"></i> Edit
+          </button>
+          ${isSelf ? '' : `<button onclick="deleteUser('${u._id}','${u.name.replace(/'/g,"\\'")}') "
+            class="flex-1 bg-red-50 hover:bg-red-100 text-red-700 font-semibold text-xs py-2 rounded-lg transition">
+            <i class="fa-solid fa-trash"></i> Delete
+          </button>`}
+        </div>
+      </div>`;
+    }).join("");
+  } catch (err) {
+    el.innerHTML = `<p class="text-red-500 col-span-full text-center py-8">${err.message}</p>`;
+  }
+}
+
+async function addUser() {
+  const name     = document.getElementById("new-user-name").value.trim();
+  const email    = document.getElementById("new-user-email").value.trim();
+  const password = document.getElementById("new-user-password").value;
+  const role     = document.getElementById("new-user-role").value;
+  const msgEl    = document.getElementById("add-user-msg");
+
+  const showMsg = (text, ok) => {
+    msgEl.className = `text-sm rounded-lg px-4 py-2 ${ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`;
+    msgEl.innerHTML = text;
+    msgEl.classList.remove("hidden");
+    if (ok) setTimeout(() => msgEl.classList.add("hidden"), 5000);
+  };
+
+  if (!name || !email || !password) return showMsg('<i class="fa-solid fa-circle-xmark"></i> All fields are required.', false);
+  if (password.length < 6)          return showMsg('<i class="fa-solid fa-circle-xmark"></i> Password must be at least 6 characters.', false);
+
+  try {
+    const res = await fetch(`${API.auth}/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, email, password, role }),
+    });
+    const data = await res.json();
+    if (!res.ok) return showMsg(`<i class="fa-solid fa-circle-xmark"></i> ${data.error}`, false);
+    showMsg('<i class="fa-solid fa-circle-check"></i> User created successfully!', true);
+    document.getElementById("new-user-name").value = "";
+    document.getElementById("new-user-email").value = "";
+    document.getElementById("new-user-password").value = "";
+    loadUsers();
+  } catch (err) {
+    showMsg(`<i class="fa-solid fa-circle-xmark"></i> ${err.message}`, false);
+  }
+}
+
+function openEditUserModal(id, name, email, role) {
+  document.getElementById("edit-user-id").value       = id;
+  document.getElementById("edit-user-name").value     = name;
+  document.getElementById("edit-user-email").value    = email;
+  document.getElementById("edit-user-role").value     = role;
+  document.getElementById("edit-user-password").value = "";
+  document.getElementById("edit-user-msg").classList.add("hidden");
+  document.getElementById("edit-user-modal").classList.remove("hidden");
+}
+
+function closeEditUserModal() {
+  document.getElementById("edit-user-modal").classList.add("hidden");
+}
+
+async function saveEditUser() {
+  const id       = document.getElementById("edit-user-id").value;
+  const name     = document.getElementById("edit-user-name").value.trim();
+  const email    = document.getElementById("edit-user-email").value.trim();
+  const role     = document.getElementById("edit-user-role").value;
+  const password = document.getElementById("edit-user-password").value;
+  const msgEl    = document.getElementById("edit-user-msg");
+
+  const showMsg = (text, ok) => {
+    msgEl.className = `text-sm rounded-lg px-4 py-2 ${ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`;
+    msgEl.innerHTML = text;
+    msgEl.classList.remove("hidden");
+  };
+
+  if (!name || !email) return showMsg('<i class="fa-solid fa-circle-xmark"></i> Name and email are required.', false);
+  if (password && password.length < 6) return showMsg('<i class="fa-solid fa-circle-xmark"></i> Password must be at least 6 characters.', false);
+
+  const body = { name, email, role };
+  if (password) body.password = password;
+
+  try {
+    const res = await apiFetch(`${API.auth}/auth/users/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) return showMsg(`<i class="fa-solid fa-circle-xmark"></i> ${data.error}`, false);
+    showMsg('<i class="fa-solid fa-circle-check"></i> User updated!', true);
+    setTimeout(closeEditUserModal, 1200);
+    loadUsers();
+  } catch (err) {
+    showMsg(`<i class="fa-solid fa-circle-xmark"></i> ${err.message}`, false);
+  }
+}
+
+async function deleteUser(id, name) {
+  if (!confirm(`Delete user "${name}"? This cannot be undone.`)) return;
+  try {
+    const res = await apiFetch(`${API.auth}/auth/users/${id}`, { method: "DELETE" });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error); return; }
+    loadUsers();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+//   PROFILE TAB
+// ══════════════════════════════════════════════════════════
+
+async function loadProfile() {
+  try {
+    const res = await apiFetch(`${API.auth}/auth/profile`);
+    if (!res.ok) return;
+    const u = await res.json();
+
+    document.getElementById("profile-name").value  = u.name  || "";
+    document.getElementById("profile-email").value = u.email || "";
+    document.getElementById("profile-role").value  = (ROLE_LABELS[u.role]?.label) || u.role || "";
+
+    document.getElementById("profile-display-name").textContent  = u.name  || "—";
+    document.getElementById("profile-display-email").textContent = u.email || "—";
+    const roleEl = document.getElementById("profile-display-role");
+    const r = ROLE_LABELS[u.role] || {};
+    roleEl.textContent  = r.label || u.role;
+    roleEl.className    = `inline-block mt-1 px-3 py-0.5 rounded-full text-xs font-semibold ${r.color || "bg-gray-100 text-gray-700"}`;
+
+    document.getElementById("profile-created-at").textContent =
+      u.created_at ? new Date(u.created_at).toLocaleDateString("en-GB", { day:"2-digit", month:"long", year:"numeric" }) : "—";
+    document.getElementById("profile-user-id").textContent = u._id || "—";
+
+    // Clear password fields
+    ["profile-current-password","profile-new-password","profile-confirm-password"].forEach(id => {
+      document.getElementById(id).value = "";
+    });
+    document.getElementById("profile-info-msg").classList.add("hidden");
+    document.getElementById("profile-pw-msg").classList.add("hidden");
+  } catch {}
+}
+
+async function saveProfileInfo() {
+  const name  = document.getElementById("profile-name").value.trim();
+  const email = document.getElementById("profile-email").value.trim();
+  const msgEl = document.getElementById("profile-info-msg");
+
+  const showMsg = (text, ok) => {
+    msgEl.className = `text-sm rounded-lg px-4 py-2 ${ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`;
+    msgEl.innerHTML = text;
+    msgEl.classList.remove("hidden");
+    if (ok) setTimeout(() => msgEl.classList.add("hidden"), 5000);
+  };
+
+  if (!name || !email) return showMsg('<i class="fa-solid fa-circle-xmark"></i> Name and email are required.', false);
+
+  try {
+    const res = await apiFetch(`${API.auth}/auth/profile`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, email }),
+    });
+    const data = await res.json();
+    if (!res.ok) return showMsg(`<i class="fa-solid fa-circle-xmark"></i> ${data.error}`, false);
+
+    // Update local user state + sidebar display
+    user = { ...user, name: data.name, email: data.email };
+    localStorage.setItem("user", JSON.stringify(user));
+    document.getElementById("profile-display-name").textContent  = data.name;
+    document.getElementById("profile-display-email").textContent = data.email;
+    const sUser = document.getElementById("sidebar-user");
+    if (sUser) sUser.innerHTML = `<p class="font-bold text-white">${data.name}</p><p class="text-xs text-gray-300">${data.role?.replace(/_/g," ")}</p>`;
+    showMsg('<i class="fa-solid fa-circle-check"></i> Profile updated successfully!', true);
+  } catch (err) {
+    showMsg(`<i class="fa-solid fa-circle-xmark"></i> ${err.message}`, false);
+  }
+}
+
+async function saveProfilePassword() {
+  const current  = document.getElementById("profile-current-password").value;
+  const newPw    = document.getElementById("profile-new-password").value;
+  const confirm  = document.getElementById("profile-confirm-password").value;
+  const msgEl    = document.getElementById("profile-pw-msg");
+
+  const showMsg = (text, ok) => {
+    msgEl.className = `text-sm rounded-lg px-4 py-2 ${ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`;
+    msgEl.innerHTML = text;
+    msgEl.classList.remove("hidden");
+    if (ok) setTimeout(() => msgEl.classList.add("hidden"), 5000);
+  };
+
+  if (!current || !newPw || !confirm) return showMsg('<i class="fa-solid fa-circle-xmark"></i> All password fields are required.', false);
+  if (newPw.length < 6)              return showMsg('<i class="fa-solid fa-circle-xmark"></i> New password must be at least 6 characters.', false);
+  if (newPw !== confirm)             return showMsg('<i class="fa-solid fa-circle-xmark"></i> New passwords do not match.', false);
+
+  try {
+    const res = await apiFetch(`${API.auth}/auth/profile`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ current_password: current, new_password: newPw }),
+    });
+    const data = await res.json();
+    if (!res.ok) return showMsg(`<i class="fa-solid fa-circle-xmark"></i> ${data.error}`, false);
+    ["profile-current-password","profile-new-password","profile-confirm-password"].forEach(id => {
+      document.getElementById(id).value = "";
+    });
+    showMsg('<i class="fa-solid fa-circle-check"></i> Password changed successfully!', true);
+  } catch (err) {
+    showMsg(`<i class="fa-solid fa-circle-xmark"></i> ${err.message}`, false);
+  }
+}
 
 async function loadAnalytics() {
   const el = document.getElementById("analytics-content");
