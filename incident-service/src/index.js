@@ -579,12 +579,5 @@ app.put("/hospitals/:id", authenticate, async (req, res) => {
 
 const PORT = process.env.PORT || 3002;
 
-Promise.all([
-  initDB(),
-  connect()
-]).then(() => {
-  app.listen(PORT, () => console.log(`Incident service running on port ${PORT}`));
-}).catch(err => {
-  console.error("Failed to initialize:", err);
-  process.exit(1);
-});
+app.listen(PORT, () => console.log(`Incident service running on port ${PORT}`));
+Promise.all([initDB(), connect()]).catch(err => console.error("Failed to initialize:", err));

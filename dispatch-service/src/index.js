@@ -229,13 +229,7 @@ app.get("/vehicles/:id/history", authenticate, async (req, res) => {
 
 const PORT = process.env.PORT || 3003;
 
-Promise.all([
-  initDB(),
-  connect()
-]).then(async () => {
+server.listen(PORT, () => console.log(`Dispatch service running on port ${PORT}`));
+Promise.all([initDB(), connect()]).then(async () => {
   await subscribeToEvent(EVENTS.INCIDENT_ASSIGNED, handleIncidentAssigned, 'incidents');
-  server.listen(PORT, () => console.log(`Dispatch service running on port ${PORT}`));
-}).catch(err => {
-  console.error("Failed to initialize:", err);
-  process.exit(1);
-});
+}).catch(err => console.error("Failed to initialize:", err));
