@@ -9,7 +9,17 @@ const swaggerDocument = require("./swagger");
 const { initDB, getDB } = require("./db");
 
 const app = express();
-app.use(cors());
+const corsOptions = {
+  origin: [
+    "https://national-emergency-platform.vercel.app",
+    "http://localhost:3000",
+    "http://localhost:3005",
+  ],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+};
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 app.use(express.json());
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
