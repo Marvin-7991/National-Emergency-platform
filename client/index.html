@@ -16,6 +16,8 @@
   #map { height: 100%; min-height: 420px; border-radius: 0.75rem; }
   #tracking-map { height: calc(100vh - 250px); min-height: 480px; border-radius: 0.75rem; }
   #map-picker { height: 300px; border-radius: 0.5rem; }
+  /* Contain Leaflet's high z-indexes so they don't bleed over page UI */
+  #map, #tracking-map, #map-picker { isolation: isolate; }
   
   /* Tab system */
   .tab-content { display: none; opacity: 0; transition: opacity 0.2s; }
@@ -142,7 +144,7 @@
 <div id="login-screen" class="flex items-center justify-center min-h-screen px-4">
   <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md border border-gray-100">
     <div class="text-center mb-8">
-      <div class="text-5xl mb-4 animate-bounce">🚨</div>
+      <div class="text-5xl mb-4 animate-bounce text-red-600"><i class="fa-solid fa-bell-exclamation"></i></div>
       <h1 class="text-3xl font-bold bg-gradient-to-r from-red-600 to-red-800 bg-clip-text text-transparent">
         Ghana Emergency Platform
       </h1>
@@ -163,7 +165,7 @@
       </div>
       <button onclick="login()"
         class="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-bold py-3 rounded-lg transition transform hover:scale-105">
-        🔐 Sign In
+        <i class="fa-solid fa-lock"></i> Sign In
       </button>
     </div>
     <p class="text-center text-sm text-gray-600 mt-5">
@@ -234,7 +236,7 @@
       </button>
       <button onclick="showLogin()"
         class="w-full border-2 border-gray-300 text-gray-700 font-semibold py-2.5 rounded-lg hover:bg-gray-50 transition">
-        ← Back to Login
+        <i class="fa-solid fa-arrow-left"></i> Back to Login
       </button>
     </div>
   </div>
@@ -246,10 +248,10 @@
     <!-- Header -->
     <div class="flex items-center justify-between px-6 py-5 bg-gradient-to-r from-red-50 to-orange-50 border-b border-gray-200 flex-shrink-0">
       <div>
-        <h3 class="font-bold text-gray-800 text-lg">📍 Select Location</h3>
+        <h3 class="font-bold text-gray-800 text-lg"><i class="fa-solid fa-location-dot"></i> Select Location</h3>
         <p class="text-xs text-gray-500 mt-0.5">Search, click the map, or use GPS to set coordinates</p>
       </div>
-      <button onclick="closeMapPicker()" class="text-gray-400 hover:text-gray-700 text-2xl leading-none">✕</button>
+      <button onclick="closeMapPicker()" class="text-gray-400 hover:text-gray-700 text-2xl leading-none"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <!-- Scrollable body: search + map + selected display -->
     <div class="overflow-y-auto flex-1 min-h-0">
@@ -263,7 +265,7 @@
               onkeydown="if(event.key==='Escape') document.getElementById('picker-results').classList.add('hidden')"/>
             <button onclick="useGpsForPicker()" title="Use your current location"
               class="flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-700 px-4 py-2.5 rounded-lg text-sm font-semibold transition whitespace-nowrap">
-              📍 My GPS
+              <i class="fa-solid fa-location-dot"></i> My GPS
             </button>
           </div>
           <div id="picker-results" class="loc-results hidden"></div>
@@ -285,7 +287,7 @@
       </button>
       <button onclick="confirmPickerLocation()" id="picker-confirm-btn" disabled
         class="px-5 py-2 bg-red-600 text-white rounded-lg text-sm font-bold hover:bg-red-700 transition disabled:opacity-40 disabled:cursor-not-allowed">
-        ✓ Confirm
+        <i class="fa-solid fa-check"></i> Confirm
       </button>
     </div>
   </div>
@@ -297,19 +299,19 @@
     <!-- Header -->
     <div class="flex items-center justify-between px-6 py-6 bg-gradient-to-r from-red-50 to-orange-50 border-b border-gray-200">
       <div class="flex items-start gap-4">
-        <span class="text-4xl">⚠️</span>
+        <span class="text-4xl text-amber-500"><i class="fa-solid fa-triangle-exclamation"></i></span>
         <div>
           <h3 class="font-bold text-gray-800 text-lg">Delete Incident?</h3>
           <p id="confirm-incident-type" class="text-sm text-gray-600 mt-1">Medical Emergency</p>
         </div>
       </div>
-      <button onclick="cancelDelete()" class="text-gray-400 hover:text-gray-700 text-2xl leading-none">✕</button>
+      <button onclick="cancelDelete()" class="text-gray-400 hover:text-gray-700 text-2xl leading-none"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <!-- Content -->
     <div class="px-6 py-5">
       <p class="text-gray-700 text-sm mb-4">This action <strong>cannot be undone</strong>. The incident will be permanently deleted from the system.</p>
       <div class="bg-red-50 border border-red-200 rounded-lg p-3">
-        <p class="text-xs text-red-800"><strong>⚠️ Warning:</strong> All associated responder and hospital assignments will be freed.</p>
+        <p class="text-xs text-red-800"><strong><i class="fa-solid fa-triangle-exclamation"></i> Warning:</strong> All associated responder and hospital assignments will be freed.</p>
       </div>
     </div>
     <!-- Footer with Buttons -->
@@ -332,7 +334,7 @@
   <aside id="sidebar" class="hidden lg:flex flex-col w-64 bg-gradient-to-b from-gray-900 to-gray-800 text-white shadow-xl fixed h-screen overflow-y-auto">
     <div class="p-6 border-b border-gray-700">
       <div class="flex items-center gap-3">
-        <span class="text-3xl">🚨</span>
+        <span class="text-3xl text-red-500"><i class="fa-solid fa-bell-exclamation"></i></span>
         <div>
           <h1 class="font-bold text-sm">Ghana Emergency</h1>
           <p class="text-xs text-gray-400">Platform</p>
@@ -341,19 +343,19 @@
     </div>
     <nav class="flex-1 p-4 overflow-y-auto space-y-2">
       <button onclick="showTab('incidents-tab', this); loadIncidents()" class="sidebar-nav-btn w-full text-left" data-role="system_admin,hospital_admin,police_admin,fire_admin,ambulance_driver">
-        <span class="text-lg mr-3">📋</span>Incidents
+        <span class="text-lg mr-3"><i class="fa-solid fa-clipboard-list"></i></span>Incidents
       </button>
       <button onclick="showTab('report-tab', this); initReportMap()" class="sidebar-nav-btn w-full text-left" data-role="system_admin">
-        <span class="text-lg mr-3">➕</span>Report Incident
+        <span class="text-lg mr-3"><i class="fa-solid fa-plus"></i></span>Report Incident
       </button>
       <button onclick="showTab('tracking-tab', this); initTrackingMap()" class="sidebar-nav-btn w-full text-left" data-role="system_admin,hospital_admin,police_admin,fire_admin,ambulance_driver">
-        <span class="text-lg mr-3">🗺️</span>Live Tracking
+        <span class="text-lg mr-3"><i class="fa-solid fa-map"></i></span>Live Tracking
       </button>
       <button onclick="showTab('analytics-tab', this); loadAnalytics()" class="sidebar-nav-btn w-full text-left" data-role="system_admin,hospital_admin,police_admin,fire_admin">
-        <span class="text-lg mr-3">📊</span>Analytics
+        <span class="text-lg mr-3"><i class="fa-solid fa-chart-bar"></i></span>Analytics
       </button>
       <button onclick="showTab('manage-tab', this); loadManageTab()" class="sidebar-nav-btn w-full text-left" data-role="system_admin,hospital_admin,police_admin,fire_admin,ambulance_driver">
-        <span class="text-lg mr-3">⚙️</span>Management
+        <span class="text-lg mr-3"><i class="fa-solid fa-gear"></i></span>Management
       </button>
     </nav>
     <div class="p-4 border-t border-gray-700 space-y-2">
@@ -362,7 +364,7 @@
         <p class="text-xs text-gray-400"></p>
       </div>
       <button onclick="logout()" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2 rounded-lg transition text-sm">
-        🚪 Logout
+        <i class="fa-solid fa-right-from-bracket"></i> Logout
       </button>
     </div>
   </aside>
@@ -371,17 +373,17 @@
   <nav class="lg:hidden bg-gradient-to-r from-red-700 via-red-600 to-red-800 text-white px-4 py-4 shadow-lg sticky top-0 z-40">
     <div class="flex justify-between items-center mb-3">
       <div class="flex items-center gap-2">
-        <span class="text-2xl">🚨</span>
+        <span class="text-2xl"><i class="fa-solid fa-bell-exclamation"></i></span>
         <span class="font-bold text-sm">Ghana Emergency Platform</span>
       </div>
-      <button onclick="toggleMobileMenu()" class="text-2xl">☰</button>
+      <button onclick="toggleMobileMenu()" class="text-2xl"><i class="fa-solid fa-bars"></i></button>
     </div>
     <div id="mobile-nav" class="hidden space-y-1 text-sm">
-      <button onclick="showTab('incidents-tab', event.target); loadIncidents(); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded hover:bg-red-600">📋 Incidents</button>
-      <button onclick="showTab('report-tab', event.target); initReportMap(); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded hover:bg-red-600" data-role="system_admin">➕ Report Incident</button>
-      <button onclick="showTab('tracking-tab', event.target); initTrackingMap(); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded hover:bg-red-600">🗺️ Live Tracking</button>
-      <button onclick="showTab('analytics-tab', event.target); loadAnalytics(); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded hover:bg-red-600">📊 Analytics</button>
-      <button onclick="showTab('manage-tab', event.target); loadManageTab(); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded hover:bg-red-600">⚙️ Management</button>
+      <button onclick="showTab('incidents-tab', event.target); loadIncidents(); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded hover:bg-red-600"><i class="fa-solid fa-clipboard-list mr-2"></i>Incidents</button>
+      <button onclick="showTab('report-tab', event.target); initReportMap(); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded hover:bg-red-600" data-role="system_admin"><i class="fa-solid fa-plus mr-2"></i>Report Incident</button>
+      <button onclick="showTab('tracking-tab', event.target); initTrackingMap(); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded hover:bg-red-600"><i class="fa-solid fa-map mr-2"></i>Live Tracking</button>
+      <button onclick="showTab('analytics-tab', event.target); loadAnalytics(); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded hover:bg-red-600"><i class="fa-solid fa-chart-bar mr-2"></i>Analytics</button>
+      <button onclick="showTab('manage-tab', event.target); loadManageTab(); toggleMobileMenu()" class="block w-full text-left px-3 py-2 rounded hover:bg-red-600"><i class="fa-solid fa-gear mr-2"></i>Management</button>
     </div>
     <div class="flex items-center justify-between text-xs">
       <div id="mobile-user">
@@ -419,7 +421,7 @@
             </div>
             <button onclick="loadIncidents()"
               class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded-lg transition text-sm">
-              🔄 Refresh
+              <i class="fa-solid fa-rotate"></i> Refresh
             </button>
           </div>
           <!-- Summary cards -->
@@ -453,17 +455,17 @@
         <!-- Compact header -->
         <div class="mb-3 flex-shrink-0 flex items-center justify-between">
           <div>
-            <h2 class="text-2xl font-bold text-gray-800">📋 Report New Incident</h2>
+            <h2 class="text-2xl font-bold text-gray-800"><i class="fa-solid fa-clipboard-list"></i> Report New Incident</h2>
             <p class="text-gray-500 text-xs mt-0.5">Log an emergency — system will auto-dispatch the nearest unit</p>
           </div>
         </div>
 
         <!-- Alerts -->
         <div id="report-error" class="hidden bg-red-50 text-red-700 px-4 py-2 rounded-lg mb-2 text-sm border border-red-200 flex items-center gap-2 flex-shrink-0">
-          <span>⚠️</span><span id="report-error-text"></span>
+          <span><i class="fa-solid fa-triangle-exclamation"></i></span><span id="report-error-text"></span>
         </div>
         <div id="report-success" class="hidden bg-green-50 text-green-700 px-4 py-2 rounded-lg mb-2 text-sm border border-green-200 flex items-center gap-2 flex-shrink-0">
-          <span>✅</span><span id="report-success-text"></span>
+          <span><i class="fa-solid fa-circle-check"></i></span><span id="report-success-text"></span>
         </div>
 
         <!-- Two-column: map left, form right -->
@@ -480,7 +482,7 @@
                   onkeydown="if(event.key==='Escape') document.getElementById('inc-search-results').classList.add('hidden')"/>
                 <button onclick="useGpsForIncident()"
                   class="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-sm font-semibold shadow-md whitespace-nowrap transition">
-                  📍 GPS
+                  <i class="fa-solid fa-location-dot"></i> GPS
                 </button>
               </div>
               <div id="inc-search-results" class="loc-results hidden"></div>
@@ -491,7 +493,7 @@
             <div id="inc-location-pill" class="hidden absolute bottom-3 left-3 right-3 z-[1000] loc-pill shadow-md"></div>
             <!-- Click hint -->
             <div class="absolute bottom-14 left-1/2 -translate-x-1/2 z-[1000] bg-black/50 text-white text-xs px-3 py-1.5 rounded-full pointer-events-none" id="map-hint">
-              👆 Click anywhere on the map to drop an incident pin
+              <i class="fa-solid fa-hand-pointer"></i> Click anywhere on the map to drop an incident pin
             </div>
           </div>
 
@@ -501,18 +503,18 @@
 
               <!-- Citizen Info -->
               <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1.5">👤 Citizen Name <span class="text-red-500">*</span></label>
+                <label class="block text-sm font-semibold text-gray-700 mb-1.5"><i class="fa-solid fa-user"></i> Citizen Name <span class="text-red-500">*</span></label>
                 <input id="citizen-name" type="text" placeholder="Full name of caller..."
                   class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 transition" required/>
               </div>
               <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1.5">📞 Contact Number</label>
+                <label class="block text-sm font-semibold text-gray-700 mb-1.5"><i class="fa-solid fa-phone"></i> Contact Number</label>
                 <input id="citizen-phone" type="tel" placeholder="+233 2XX XXX XXXX"
                   class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 transition"/>
               </div>
 
               <div class="border-t pt-4">
-                <label class="block text-sm font-semibold text-gray-700 mb-1.5">🚨 Incident Type <span class="text-red-500">*</span></label>
+                <label class="block text-sm font-semibold text-gray-700 mb-1.5"><i class="fa-solid fa-bell-exclamation"></i> Incident Type <span class="text-red-500">*</span></label>
                 <select id="incident-type"
                   class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 transition" required>
                   <option value="">Select incident type...</option>
@@ -528,7 +530,7 @@
                 </select>
               </div>
               <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1.5">🔍 Severity Level</label>
+                <label class="block text-sm font-semibold text-gray-700 mb-1.5"><i class="fa-solid fa-magnifying-glass"></i> Severity Level</label>
                 <select id="incident-severity"
                   class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 transition">
                   <option value="low">🟢 Low Priority</option>
@@ -540,7 +542,7 @@
 
               <!-- Coordinates (read-only, updated by map click) -->
               <div class="border-t pt-4">
-                <label class="block text-xs font-semibold text-gray-500 mb-2">📍 Selected Coordinates</label>
+                <label class="block text-xs font-semibold text-gray-500 mb-2"><i class="fa-solid fa-location-dot"></i> Selected Coordinates</label>
                 <div class="grid grid-cols-2 gap-2">
                   <div>
                     <label class="text-xs text-gray-400 mb-1 block">Latitude</label>
@@ -557,7 +559,7 @@
 
               <!-- Notes -->
               <div class="border-t pt-4">
-                <label class="block text-sm font-semibold text-gray-700 mb-1.5">📝 Incident Notes</label>
+                <label class="block text-sm font-semibold text-gray-700 mb-1.5"><i class="fa-solid fa-note-sticky"></i> Incident Notes</label>
                 <textarea id="incident-notes" rows="4"
                   placeholder="Describe the situation (injuries, hazards, people involved)..."
                   class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 transition resize-none"></textarea>
@@ -566,12 +568,12 @@
               <!-- Submit -->
               <button onclick="submitIncident()"
                 class="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-bold py-3.5 rounded-lg transition transform hover:scale-105 text-sm shadow-md">
-                🚨 Submit Incident & Dispatch Responder
+                <i class="fa-solid fa-bell-exclamation"></i> Submit Incident & Dispatch Responder
               </button>
 
               <!-- Dispatch info panel (shown after submit) -->
               <div id="dispatch-info" class="hidden bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800 space-y-1">
-                <p class="font-bold text-sm">🚒 Dispatch Details</p>
+                <p class="font-bold text-sm"><i class="fa-solid fa-fire-flame-curved"></i> Dispatch Details</p>
                 <p id="dispatch-unit"></p>
                 <p id="dispatch-eta"></p>
                 <div class="mt-2 pt-2 border-t border-blue-200">
@@ -590,7 +592,7 @@
         <!-- Header -->
         <div class="mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div>
-            <h2 class="text-3xl font-bold text-gray-800">🗺️ Live Vehicle Tracking</h2>
+            <h2 class="text-3xl font-bold text-gray-800"><i class="fa-solid fa-map"></i> Live Vehicle Tracking</h2>
             <p class="text-gray-500 text-sm mt-1">Real-time animated GPS tracking of all emergency units</p>
           </div>
           <div class="flex items-center gap-3">
@@ -613,8 +615,8 @@
             <!-- GPS Update Log -->
             <div class="card">
               <div class="flex justify-between items-center mb-2">
-                <h3 class="font-bold text-gray-800 text-sm">📡 Live GPS Update Log</h3>
-                <button onclick="clearSimLog()" class="text-xs text-gray-400 hover:text-red-500 transition">🗑 Clear</button>
+                <h3 class="font-bold text-gray-800 text-sm"><i class="fa-solid fa-satellite-dish"></i> Live GPS Update Log</h3>
+                <button onclick="clearSimLog()" class="text-xs text-gray-400 hover:text-red-500 transition"><i class="fa-solid fa-trash"></i> Clear</button>
               </div>
               <div id="sim-log" class="max-h-28 overflow-y-auto space-y-px">
                 <p class="text-gray-400 text-xs text-center py-3">No GPS updates yet — start simulation or wait for live updates</p>
@@ -632,18 +634,18 @@
             <!-- Active Units -->
             <div class="card">
               <div class="flex justify-between items-center mb-3">
-                <h3 class="font-bold text-gray-800 text-sm">🚨 Active Units</h3>
-                <button onclick="fitAllVehicles()" title="Zoom to fit all vehicles" class="text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded transition">🔍 Fit</button>
+                <h3 class="font-bold text-gray-800 text-sm"><i class="fa-solid fa-bell-exclamation"></i> Active Units</h3>
+                <button onclick="fitAllVehicles()" title="Zoom to fit all vehicles" class="text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded transition"><i class="fa-solid fa-magnifying-glass"></i> Fit</button>
               </div>
               <div id="vehicle-list" class="space-y-2 max-h-56 overflow-y-auto">
                 <p class="text-gray-400 text-xs text-center py-3">No vehicles registered yet</p>
               </div>
-              <button onclick="loadVehicles()" class="w-full mt-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-xs py-1.5 rounded-lg transition">🔄 Refresh</button>
+              <button onclick="loadVehicles()" class="w-full mt-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-xs py-1.5 rounded-lg transition"><i class="fa-solid fa-rotate"></i> Refresh</button>
             </div>
 
             <!-- Simulation Controls -->
             <div class="card">
-              <h3 class="font-bold text-gray-800 mb-3">🎮 Simulation</h3>
+              <h3 class="font-bold text-gray-800 mb-3"><i class="fa-solid fa-gamepad"></i> Simulation</h3>
 
               <div class="space-y-3">
                 <div>
@@ -666,13 +668,13 @@
                 <!-- Auto-simulate toggle -->
                 <button id="auto-sim-btn" onclick="toggleAutoSim()"
                   class="w-full bg-green-600 hover:bg-green-700 text-white font-bold text-sm py-2.5 rounded-lg transition">
-                  ▶ Start Auto-Simulate
+                  <i class="fa-solid fa-play"></i> Start Auto-Simulate
                 </button>
 
                 <!-- Single step -->
                 <button onclick="simulateGPS()"
                   class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm py-2 rounded-lg transition">
-                  📍 Single Step
+                  <i class="fa-solid fa-location-dot"></i> Single Step
                 </button>
               </div>
 
@@ -695,14 +697,14 @@
       <!-- ── TAB 4: Management ──────────────────────────────────── -->
       <div id="manage-tab" class="tab-content">
         <div class="mb-6">
-          <h2 class="text-3xl font-bold text-gray-800">⚙️ Management Dashboard</h2>
+          <h2 class="text-3xl font-bold text-gray-800"><i class="fa-solid fa-gear"></i> Management Dashboard</h2>
           <p class="text-gray-500 text-sm mt-1">Manage hospitals, responders, and vehicles</p>
         </div>
         <div id="manage-content" class="space-y-6">
 
           <!-- Hospital management -->
           <div id="hospitals-panel" data-role="system_admin,hospital_admin" class="card">
-            <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">🏥 Hospital Capacity Management</h3>
+            <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2"><i class="fa-solid fa-hospital"></i> Hospital Capacity Management</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
               <div>
                 <label class="block text-sm font-semibold text-gray-700 mb-2">Hospital Name</label>
@@ -718,7 +720,7 @@
                 <label class="block text-sm font-semibold text-gray-700 mb-2">Location</label>
                 <button type="button" class="pick-btn"
                   onclick="openMapPicker('new-hospital-lat','new-hospital-lon','hospital-loc-pill')">
-                  📍 Click to pick hospital location on map
+                  <i class="fa-solid fa-location-dot"></i> Click to pick hospital location on map
                 </button>
                 <div id="hospital-loc-pill" class="hidden loc-pill mt-2"></div>
                 <input id="new-hospital-lat" type="hidden"/>
@@ -728,11 +730,11 @@
             <div class="flex gap-3 mb-5">
               <button onclick="createHospital()"
                 class="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-2.5 rounded-lg transition">
-                ➕ Add Hospital
+                <i class="fa-solid fa-plus"></i> Add Hospital
               </button>
               <button onclick="loadHospitals()"
                 class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-6 py-2.5 rounded-lg transition">
-                🔄 Refresh
+                <i class="fa-solid fa-rotate"></i> Refresh
               </button>
             </div>
             <div id="hospitals-list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -742,7 +744,7 @@
 
           <!-- Responder management -->
           <div id="responders-panel" data-role="system_admin,police_admin,fire_admin" class="card">
-            <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">🚔 Responder Stations</h3>
+            <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2"><i class="fa-solid fa-shield-halved"></i> Responder Stations</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
               <div>
                 <label class="block text-sm font-semibold text-gray-700 mb-2">Unit Name</label>
@@ -762,7 +764,7 @@
                 <label class="block text-sm font-semibold text-gray-700 mb-2">Station Location</label>
                 <button type="button" class="pick-btn"
                   onclick="openMapPicker('new-responder-lat','new-responder-lon','responder-loc-pill')">
-                  📍 Click to pick station location on map
+                  <i class="fa-solid fa-location-dot"></i> Click to pick station location on map
                 </button>
                 <div id="responder-loc-pill" class="hidden loc-pill mt-2"></div>
                 <input id="new-responder-lat" type="hidden"/>
@@ -772,11 +774,11 @@
             <div class="flex gap-3 mb-5">
               <button onclick="addResponder()"
                 class="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-2.5 rounded-lg transition">
-                ➕ Add Responder
+                <i class="fa-solid fa-plus"></i> Add Responder
               </button>
               <button onclick="loadResponders()"
                 class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-6 py-2.5 rounded-lg transition">
-                🔄 Refresh
+                <i class="fa-solid fa-rotate"></i> Refresh
               </button>
             </div>
             <div id="responders-list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -786,7 +788,7 @@
 
           <!-- Vehicle & Unit Registration (admin + drivers) -->
           <div id="driver-panel" data-role="system_admin,ambulance_driver,police_admin,fire_admin" class="card">
-            <h3 class="text-xl font-bold text-gray-800 mb-1 flex items-center gap-2">🚗 Register Emergency Vehicle / Unit</h3>
+            <h3 class="text-xl font-bold text-gray-800 mb-1 flex items-center gap-2"><i class="fa-solid fa-car"></i> Register Emergency Vehicle / Unit</h3>
             <p class="text-gray-500 text-sm mb-4">Add vehicles in any region — especially less-endowed areas that need coverage</p>
 
             <!-- Region quick-jump -->
@@ -800,12 +802,12 @@
                 <button onclick="jumpToRegion(6.0940,-0.2570,'Eastern')" class="text-xs bg-gray-100 hover:bg-blue-100 border border-gray-300 rounded px-2 py-1 transition">Eastern</button>
                 <button onclick="jumpToRegion(5.6037,-0.1870,'Greater Accra')" class="text-xs bg-gray-100 hover:bg-blue-100 border border-gray-300 rounded px-2 py-1 transition">Greater Accra</button>
                 <button onclick="jumpToRegion(6.6885,-1.6244,'Ashanti')" class="text-xs bg-gray-100 hover:bg-blue-100 border border-gray-300 rounded px-2 py-1 transition">Ashanti</button>
-                <button onclick="jumpToRegion(9.4034,-0.8424,'Northern')" class="text-xs bg-red-50 hover:bg-red-100 border border-red-300 rounded px-2 py-1 transition font-semibold text-red-700">Northern ⚠</button>
-                <button onclick="jumpToRegion(9.0840,-1.8220,'Savannah')" class="text-xs bg-red-50 hover:bg-red-100 border border-red-300 rounded px-2 py-1 transition font-semibold text-red-700">Savannah ⚠</button>
-                <button onclick="jumpToRegion(10.5200,-0.3640,'North East')" class="text-xs bg-red-50 hover:bg-red-100 border border-red-300 rounded px-2 py-1 transition font-semibold text-red-700">North East ⚠</button>
-                <button onclick="jumpToRegion(10.7854,-0.8514,'Upper East')" class="text-xs bg-red-50 hover:bg-red-100 border border-red-300 rounded px-2 py-1 transition font-semibold text-red-700">Upper East ⚠</button>
-                <button onclick="jumpToRegion(10.0601,-2.5099,'Upper West')" class="text-xs bg-red-50 hover:bg-red-100 border border-red-300 rounded px-2 py-1 transition font-semibold text-red-700">Upper West ⚠</button>
-                <button onclick="jumpToRegion(8.0730,0.1780,'Oti')" class="text-xs bg-red-50 hover:bg-red-100 border border-red-300 rounded px-2 py-1 transition font-semibold text-red-700">Oti ⚠</button>
+                <button onclick="jumpToRegion(9.4034,-0.8424,'Northern')" class="text-xs bg-red-50 hover:bg-red-100 border border-red-300 rounded px-2 py-1 transition font-semibold text-red-700">Northern <i class="fa-solid fa-triangle-exclamation"></i></button>
+                <button onclick="jumpToRegion(9.0840,-1.8220,'Savannah')" class="text-xs bg-red-50 hover:bg-red-100 border border-red-300 rounded px-2 py-1 transition font-semibold text-red-700">Savannah <i class="fa-solid fa-triangle-exclamation"></i></button>
+                <button onclick="jumpToRegion(10.5200,-0.3640,'North East')" class="text-xs bg-red-50 hover:bg-red-100 border border-red-300 rounded px-2 py-1 transition font-semibold text-red-700">North East <i class="fa-solid fa-triangle-exclamation"></i></button>
+                <button onclick="jumpToRegion(10.7854,-0.8514,'Upper East')" class="text-xs bg-red-50 hover:bg-red-100 border border-red-300 rounded px-2 py-1 transition font-semibold text-red-700">Upper East <i class="fa-solid fa-triangle-exclamation"></i></button>
+                <button onclick="jumpToRegion(10.0601,-2.5099,'Upper West')" class="text-xs bg-red-50 hover:bg-red-100 border border-red-300 rounded px-2 py-1 transition font-semibold text-red-700">Upper West <i class="fa-solid fa-triangle-exclamation"></i></button>
+                <button onclick="jumpToRegion(8.0730,0.1780,'Oti')" class="text-xs bg-red-50 hover:bg-red-100 border border-red-300 rounded px-2 py-1 transition font-semibold text-red-700">Oti <i class="fa-solid fa-triangle-exclamation"></i></button>
                 <button onclick="jumpToRegion(6.6012,0.4700,'Volta')" class="text-xs bg-gray-100 hover:bg-blue-100 border border-gray-300 rounded px-2 py-1 transition">Volta</button>
                 <button onclick="jumpToRegion(4.8845,-1.7554,'Western')" class="text-xs bg-gray-100 hover:bg-blue-100 border border-gray-300 rounded px-2 py-1 transition">Western</button>
                 <button onclick="jumpToRegion(6.2080,-2.4860,'Western North')" class="text-xs bg-gray-100 hover:bg-blue-100 border border-gray-300 rounded px-2 py-1 transition">Western North</button>
@@ -816,7 +818,7 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
               <!-- Register vehicle -->
               <div class="border border-gray-300 rounded-lg p-4">
-                <p class="text-sm font-bold text-gray-800 mb-4">🚗 Vehicle Registration</p>
+                <p class="text-sm font-bold text-gray-800 mb-4"><i class="fa-solid fa-car"></i> Vehicle Registration</p>
                 <div class="space-y-3">
                   <input id="vehicle-id" type="text" placeholder="Vehicle ID (e.g., TAM-AMB-03)"
                     class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition"/>
@@ -828,7 +830,7 @@
                     <option value="police">🚔 Police Vehicle</option>
                     <option value="fire">🚒 Fire Truck</option>
                   </select>
-                  <label class="block text-xs font-semibold text-gray-600">📍 Station Location — click map or use region buttons above</label>
+                  <label class="block text-xs font-semibold text-gray-600"><i class="fa-solid fa-location-dot"></i> Station Location — click map or use region buttons above</label>
                   <button type="button" class="pick-btn text-sm"
                     onclick="openMapPicker('vehicle-lat','vehicle-lon','vehicle-loc-pill')">
                     Click to pick location on map (whole Ghana)
@@ -844,7 +846,7 @@
               </div>
               <!-- Update location -->
               <div class="border border-gray-300 rounded-lg p-4">
-                <p class="text-sm font-bold text-gray-800 mb-4">📍 Send Location Update</p>
+                <p class="text-sm font-bold text-gray-800 mb-4"><i class="fa-solid fa-location-dot"></i> Send Location Update</p>
                 <div class="space-y-3">
                   <input id="update-vehicle-id" type="text" placeholder="Vehicle ID"
                     class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition"/>
@@ -864,7 +866,7 @@
                   </select>
                   <button onclick="updateVehicleLocation()"
                     class="w-full bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2.5 rounded-lg text-sm transition">
-                    📤 Send Location
+                    <i class="fa-solid fa-paper-plane"></i> Send Location
                   </button>
                 </div>
               </div>
@@ -878,7 +880,7 @@
       <!-- ── TAB 5: Analytics ───────────────────────────────────── -->
       <div id="analytics-tab" class="tab-content">
         <div class="mb-6">
-          <h2 class="text-3xl font-bold text-gray-800">📊 Analytics & Insights</h2>
+          <h2 class="text-3xl font-bold text-gray-800"><i class="fa-solid fa-chart-bar"></i> Analytics & Insights</h2>
           <p class="text-gray-500 text-sm mt-1">Real-time operational metrics and statistics</p>
         </div>
         <div id="analytics-content">
@@ -1381,14 +1383,14 @@ async function submitIncident() {
     const etaSec = Math.round(travelMs / 1000);
     const etaStr = etaSec >= 60 ? `${Math.ceil(etaSec/60)} min` : `${etaSec} sec`;
 
-    sucText.innerHTML = `<strong>Incident created!</strong> ${responderName ? `Dispatching <strong>${responderName}</strong> — ETA ~${etaStr}` : "⚠️ No available responder found nearby."}`;
+    sucText.innerHTML = `<strong>Incident created!</strong> ${responderName ? `Dispatching <strong>${responderName}</strong> — ETA ~${etaStr}` : '<i class="fa-solid fa-triangle-exclamation"></i> No available responder found nearby.'}`;
     sucEl.classList.remove("hidden");
 
     // Show dispatch info panel
     if (responderName && data.assigned_vehicle_id) {
       document.getElementById("dispatch-info").classList.remove("hidden");
-      document.getElementById("dispatch-unit").textContent = `🚒 Unit: ${data.assigned_vehicle_id} — ${responderName}`;
-      document.getElementById("dispatch-eta").textContent = `⏱ ETA: ~${etaStr}`;
+      document.getElementById("dispatch-unit").innerHTML = `<i class="fa-solid fa-fire-flame-curved"></i> Unit: ${data.assigned_vehicle_id} — ${responderName}`;
+      document.getElementById("dispatch-eta").innerHTML = `<i class="fa-regular fa-clock"></i> ETA: ~${etaStr}`;
       const tl = document.getElementById("dispatch-timeline");
       const now = Date.now();
       const inProgressMs = Math.max(2000, travelMs * 0.05);
@@ -1498,7 +1500,7 @@ async function loadIncidents() {
 
     if (!Array.isArray(data) || !data.length) {
       el.innerHTML = `<div class="bg-gradient-to-r from-green-50 to-blue-50 rounded-xl p-12 text-center shadow-sm border border-green-200">
-        <p class="text-4xl mb-3">📋</p>
+        <p class="text-4xl mb-3"><i class="fa-solid fa-clipboard-list text-gray-400"></i></p>
         <p class="text-gray-700 font-semibold">No Incidents Logged Yet</p>
         <p class="text-gray-500 text-sm mt-1">Submit an incident using the Report tab to get started.</p>
       </div>`;
@@ -1511,13 +1513,13 @@ async function loadIncidents() {
     el.innerHTML = data.map(inc => {
       const responder  = Array.isArray(inc.responder) ? inc.responder[0] : inc.responder;
       const hospital   = Array.isArray(inc.hospital)  ? inc.hospital[0]  : inc.hospital;
-      const icons      = { police:"🚔", fire:"🚒", ambulance:"🚑" };
-      const typeEmoji  = inc.incident_type.includes('Medical') ? '🏥'
-        : inc.incident_type.includes('Fire') ? '🔥'
-        : inc.incident_type.includes('Robbery') || inc.incident_type.includes('Crime') ? '💰'
-        : inc.incident_type.includes('Accident') ? '🚗'
-        : inc.incident_type.includes('Explosion') ? '💥'
-        : inc.incident_type.includes('Flood') ? '🌊' : '⚠️';
+      const icons      = { police:"<i class='fa-solid fa-shield-halved'></i>", fire:"<i class='fa-solid fa-fire-flame-curved'></i>", ambulance:"<i class='fa-solid fa-truck-medical'></i>" };
+      const typeEmoji  = inc.incident_type.includes('Medical') ? '<i class="fa-solid fa-hospital-user"></i>'
+        : inc.incident_type.includes('Fire') ? '<i class="fa-solid fa-fire"></i>'
+        : inc.incident_type.includes('Robbery') || inc.incident_type.includes('Crime') ? '<i class="fa-solid fa-user-secret"></i>'
+        : inc.incident_type.includes('Accident') ? '<i class="fa-solid fa-car-burst"></i>'
+        : inc.incident_type.includes('Explosion') ? '<i class="fa-solid fa-explosion"></i>'
+        : inc.incident_type.includes('Flood') ? '<i class="fa-solid fa-water"></i>' : '<i class="fa-solid fa-triangle-exclamation"></i>';
       const time = new Date(inc.created_at).toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'});
       const date = new Date(inc.created_at).toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'});
       const isResolved = inc.status === 'resolved';
@@ -1530,7 +1532,7 @@ async function loadIncidents() {
       // Status-update dropdown — hidden for resolved incidents
       const statusControl = isResolved
         ? `<div class="flex items-center gap-2 bg-green-100 text-green-800 rounded-lg px-3 py-2 text-sm font-semibold">
-             ✅ Incident Resolved
+             <i class="fa-solid fa-circle-check"></i> Incident Resolved
            </div>`
         : `<select onchange="updateStatus('${inc._id}', this.value); this.value='';"
              class="border border-gray-300 rounded-lg px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-red-500">
@@ -1553,28 +1555,28 @@ async function loadIncidents() {
               </div>
             </div>
             <div class="space-y-1 text-sm text-gray-600 mt-2">
-              <p>👤 <strong>${inc.citizen_name}</strong></p>
-              <p>📍 ${parseFloat(inc.latitude).toFixed(4)}, ${parseFloat(inc.longitude).toFixed(4)}</p>
-              ${responder ? `<p>${icons[responder.type] || '🚒'} Unit: <strong>${responder.name}</strong></p>` : ''}
-              ${inc.assigned_vehicle_id ? `<p>🚗 Vehicle: <strong>${inc.assigned_vehicle_id}</strong></p>` : ''}
-              ${hospital  ? `<p>🏥 Hospital: <strong>${hospital.name}</strong></p>` : ''}
-              ${inc.notes ? `<p class="italic text-gray-400 mt-1 text-xs">📝 ${inc.notes}</p>` : ''}
+              <p><i class="fa-solid fa-user fa-fw"></i> <strong>${inc.citizen_name}</strong></p>
+              <p><i class="fa-solid fa-location-dot fa-fw"></i> ${parseFloat(inc.latitude).toFixed(4)}, ${parseFloat(inc.longitude).toFixed(4)}</p>
+              ${responder ? `<p>${icons[responder.type] || '<i class="fa-solid fa-fire-flame-curved"></i>'} Unit: <strong>${responder.name}</strong></p>` : ''}
+              ${inc.assigned_vehicle_id ? `<p><i class="fa-solid fa-car fa-fw"></i> Vehicle: <strong>${inc.assigned_vehicle_id}</strong></p>` : ''}
+              ${hospital  ? `<p><i class="fa-solid fa-hospital fa-fw"></i> Hospital: <strong>${hospital.name}</strong></p>` : ''}
+              ${inc.notes ? `<p class="italic text-gray-400 mt-1 text-xs"><i class="fa-solid fa-note-sticky fa-fw"></i> ${inc.notes}</p>` : ''}
             </div>
           </div>
           <div class="flex flex-col gap-2 min-w-[190px]">
             ${statusControl}
             <button onclick="deleteIncident('${inc._id}', '${inc.incident_type}')"
               class="bg-red-100 hover:bg-red-200 text-red-800 font-semibold px-3 py-2 rounded-lg text-sm transition">
-              🗑️ Delete Log
+              <i class="fa-solid fa-trash"></i> Delete Log
             </button>
-            <p class="text-xs text-gray-400 text-center">⏰ ${time} · ${date}</p>
+            <p class="text-xs text-gray-400 text-center"><i class="fa-regular fa-clock"></i> ${time} · ${date}</p>
           </div>
         </div>
       </div>`;
     }).join("");
   } catch (err) {
     el.innerHTML = `<div class="bg-red-50 border border-red-200 rounded-lg p-6 text-red-700">
-      <p class="font-semibold">⚠️ Failed to load incidents</p>
+      <p class="font-semibold"><i class="fa-solid fa-triangle-exclamation"></i> Failed to load incidents</p>
       <p class="text-sm mt-1">${err.message}</p>
     </div>`;
   }
@@ -1656,14 +1658,14 @@ async function confirmDelete() {
     const data = await res.json();
     
     if (!res.ok) {
-      errText.innerHTML = `<strong>❌ Failed to delete incident</strong><br>${data.error || "Please try again."}`;
+      errText.innerHTML = `<strong><i class="fa-solid fa-circle-xmark"></i> Failed to delete incident</strong><br>${data.error || "Please try again."}`;
       errEl.classList.remove("hidden");
       setTimeout(() => errEl.classList.add("hidden"), 8000);
       return;
     }
     
     // Show success message
-    sucText.innerHTML = `<strong>✅ Incident deleted successfully</strong>`;
+    sucText.innerHTML = `<strong><i class="fa-solid fa-circle-check"></i> Incident deleted successfully</strong>`;
     sucEl.classList.remove("hidden");
     setTimeout(() => sucEl.classList.add("hidden"), 5000);
     
@@ -1671,7 +1673,7 @@ async function confirmDelete() {
   } catch (err) {
     const errEl = document.getElementById("report-error");
     const errText = document.getElementById("report-error-text");
-    errText.innerHTML = `<strong>❌ Error deleting incident</strong><br>${err.message}`;
+    errText.innerHTML = `<strong><i class="fa-solid fa-circle-xmark"></i> Error deleting incident</strong><br>${err.message}`;
     errEl.classList.remove("hidden");
     setTimeout(() => errEl.classList.add("hidden"), 8000);
   } finally {
@@ -1726,8 +1728,8 @@ async function loadHospitals() {
         data-hospital-id="${h._id}" data-available="${h.available_beds}">
         <div class="flex items-start justify-between mb-3">
           <div>
-            <h4 class="font-bold text-gray-800">🏥 ${h.name}</h4>
-            <p class="text-xs text-gray-500 mt-0.5">📍 ${h.latitude?.toFixed(4)}, ${h.longitude?.toFixed(4)}</p>
+            <h4 class="font-bold text-gray-800"><i class="fa-solid fa-hospital"></i> ${h.name}</h4>
+            <p class="text-xs text-gray-500 mt-0.5"><i class="fa-solid fa-location-dot"></i> ${h.latitude?.toFixed(4)}, ${h.longitude?.toFixed(4)}</p>
           </div>
           <span class="text-2xl font-bold text-${healthColor}-600">${h.available_beds}/${h.capacity}</span>
         </div>
@@ -1762,7 +1764,7 @@ async function createHospital() {
   if (!name || isNaN(latitude) || isNaN(longitude) || isNaN(beds)) {
     const errEl = document.getElementById("report-error");
     const errText = document.getElementById("report-error-text");
-    errText.innerHTML = `<strong>❌ Please fill all fields and pick a location on the map.</strong>`;
+    errText.innerHTML = `<strong><i class="fa-solid fa-circle-xmark"></i> Please fill all fields and pick a location on the map.</strong>`;
     errEl.classList.remove("hidden");
     setTimeout(() => errEl.classList.add("hidden"), 5000);
     return;
@@ -1782,7 +1784,7 @@ async function createHospital() {
   } catch (err) {
     const errEl = document.getElementById("report-error");
     const errText = document.getElementById("report-error-text");
-    errText.innerHTML = `<strong>❌ Failed to create hospital:</strong> ${err.message}`;
+    errText.innerHTML = `<strong><i class="fa-solid fa-circle-xmark"></i> Failed to create hospital:</strong> ${err.message}`;
     errEl.classList.remove("hidden");
     setTimeout(() => errEl.classList.add("hidden"), 5000);
   }
@@ -1802,7 +1804,7 @@ async function adjustHospitalBeds(id, delta) {
   } catch (err) {
     const errEl = document.getElementById("report-error");
     const errText = document.getElementById("report-error-text");
-    errText.innerHTML = `<strong>❌ Failed to update capacity:</strong> ${err.message}`;
+    errText.innerHTML = `<strong><i class="fa-solid fa-circle-xmark"></i> Failed to update capacity:</strong> ${err.message}`;
     errEl.classList.remove("hidden");
     setTimeout(() => errEl.classList.add("hidden"), 5000);
   }
@@ -1819,7 +1821,7 @@ async function loadResponders() {
       el.innerHTML = `<p class="text-gray-400 text-sm col-span-full text-center py-8">No responders registered yet. Add one to get started.</p>`;
       return;
     }
-    const typeIcon = { police:"🚔", fire:"🚒", ambulance:"🚑" };
+    const typeIcon = { police:'<i class="fa-solid fa-shield-halved"></i>', fire:'<i class="fa-solid fa-fire-flame-curved"></i>', ambulance:'<i class="fa-solid fa-truck-medical"></i>' };
     const typeColor = { police:"blue", fire:"orange", ambulance:"red" };
     el.innerHTML = data.map(r => {
       const color = typeColor[r.type] || "gray";
@@ -1828,10 +1830,10 @@ async function loadResponders() {
         <div class="flex items-start justify-between mb-3">
           <div>
             <h4 class="font-bold text-gray-800 flex items-center gap-2">
-              <span class="text-2xl">${typeIcon[r.type]||"🚗"}</span>
+              ${typeIcon[r.type]||'<i class="fa-solid fa-car"></i>'}
               ${r.name}
             </h4>
-            <p class="text-xs text-gray-500 mt-0.5 capitalize">${r.type} • 📍 ${r.latitude.toFixed(4)}, ${r.longitude.toFixed(4)}</p>
+            <p class="text-xs text-gray-500 mt-0.5 capitalize">${r.type} • <i class="fa-solid fa-location-dot"></i> ${r.latitude.toFixed(4)}, ${r.longitude.toFixed(4)}</p>
           </div>
           <span class="px-3 py-1 rounded-full font-semibold text-sm ${
             r.is_available ? `bg-green-100 text-green-700` : `bg-red-100 text-red-700`
@@ -1858,7 +1860,7 @@ async function addResponder() {
   if (!name || !type || isNaN(latitude) || isNaN(longitude)) {
     const errEl = document.getElementById("report-error");
     const errText = document.getElementById("report-error-text");
-    errText.innerHTML = `<strong>❌ Please fill all fields and pick a station location on the map.</strong>`;
+    errText.innerHTML = `<strong><i class="fa-solid fa-circle-xmark"></i> Please fill all fields and pick a station location on the map.</strong>`;
     errEl.classList.remove("hidden");
     setTimeout(() => errEl.classList.add("hidden"), 5000);
     return;
@@ -1877,7 +1879,7 @@ async function addResponder() {
   } catch (err) {
     const errEl = document.getElementById("report-error");
     const errText = document.getElementById("report-error-text");
-    errText.innerHTML = `<strong>❌ Failed to add responder:</strong> ${err.message}`;
+    errText.innerHTML = `<strong><i class="fa-solid fa-circle-xmark"></i> Failed to add responder:</strong> ${err.message}`;
     errEl.classList.remove("hidden");
     setTimeout(() => errEl.classList.add("hidden"), 5000);
   }
@@ -1893,7 +1895,7 @@ async function registerVehicle() {
 
   if (!vehicleId || !vehicleName || isNaN(latitude) || isNaN(longitude)) {
     const driverStatus = document.getElementById("driver-status");
-    driverStatus.innerHTML = `<span class="text-red-600"><strong>❌ Error:</strong> Please fill all fields and pick a starting location on the map.</span>`;
+    driverStatus.innerHTML = `<span class="text-red-600"><strong><i class="fa-solid fa-circle-xmark"></i> Error:</strong> Please fill all fields and pick a starting location on the map.</span>`;
     return;
   }
   try {
@@ -1906,13 +1908,13 @@ async function registerVehicle() {
     const driverStatus = document.getElementById("driver-status");
     
     if (!res.ok) {
-      driverStatus.innerHTML = `<span class="text-red-600"><strong>❌ Registration Failed:</strong> ${data.error || "Please try again."}</span>`;
+      driverStatus.innerHTML = `<span class="text-red-600"><strong><i class="fa-solid fa-circle-xmark"></i> Registration Failed:</strong> ${data.error || "Please try again."}</span>`;
       return;
     }
     
     localStorage.setItem("vehicleId", vehicleId);
     document.getElementById("update-vehicle-id").value = vehicleId;
-    driverStatus.innerHTML = `<span class="text-green-600"><strong>✅ Vehicle registered successfully!</strong> Vehicle ID: ${vehicleId}</span>`;
+    driverStatus.innerHTML = `<span class="text-green-600"><strong><i class="fa-solid fa-circle-check"></i> Vehicle registered successfully!</strong> Vehicle ID: ${vehicleId}</span>`;
     
     // Reset the form
     document.getElementById("vehicle-id").value = "";
@@ -1926,7 +1928,7 @@ async function registerVehicle() {
     loadVehicles();
   } catch (err) {
     const driverStatus = document.getElementById("driver-status");
-    driverStatus.innerHTML = `<span class="text-red-600"><strong>❌ Error:</strong> ${err.message}</span>`;
+    driverStatus.innerHTML = `<span class="text-red-600"><strong><i class="fa-solid fa-circle-xmark"></i> Error:</strong> ${err.message}</span>`;
   }
 }
 
@@ -1938,7 +1940,7 @@ async function updateVehicleLocation() {
   const driverStatus = document.getElementById("driver-status");
 
   if (!vehicleId || isNaN(latitude) || isNaN(longitude)) {
-    driverStatus.innerHTML = `<span class="text-red-600"><strong>❌ Error:</strong> Please fill all fields and pick a location on the map.</span>`;
+    driverStatus.innerHTML = `<span class="text-red-600"><strong><i class="fa-solid fa-circle-xmark"></i> Error:</strong> Please fill all fields and pick a location on the map.</span>`;
     return;
   }
   try {
@@ -1950,11 +1952,11 @@ async function updateVehicleLocation() {
     const data = await res.json();
     
     if (!res.ok) {
-      driverStatus.innerHTML = `<span class="text-red-600"><strong>❌ Update Failed:</strong> ${data.error || "Please try again."}</span>`;
+      driverStatus.innerHTML = `<span class="text-red-600"><strong><i class="fa-solid fa-circle-xmark"></i> Update Failed:</strong> ${data.error || "Please try again."}</span>`;
       return;
     }
     
-    driverStatus.innerHTML = `<span class="text-green-600"><strong>✅ Location updated for vehicle ${vehicleId}</strong></span>`;
+    driverStatus.innerHTML = `<span class="text-green-600"><strong><i class="fa-solid fa-circle-check"></i> Location updated for vehicle ${vehicleId}</strong></span>`;
     
     // Reset the form
     document.getElementById("update-lat").value = "";
@@ -1964,7 +1966,7 @@ async function updateVehicleLocation() {
     // Refresh vehicles to show new location
     loadVehicles();
   } catch (err) {
-    driverStatus.innerHTML = `<span class="text-red-600"><strong>❌ Error:</strong> ${err.message}</span>`;
+    driverStatus.innerHTML = `<span class="text-red-600"><strong><i class="fa-solid fa-circle-xmark"></i> Error:</strong> ${err.message}</span>`;
   }
 }
 
@@ -2104,7 +2106,7 @@ function _updateDispatchPanel(vehicleId) {
   const pct     = Math.min(100, Math.round((elapsed / route.travelMs) * 100));
   const remMs   = Math.max(0, route.travelMs - elapsed);
   const remStr  = remMs >= 60000 ? `${Math.ceil(remMs / 60000)} min` : `${Math.ceil(remMs / 1000)} sec`;
-  const icon    = vehicleIcons[vd.vehicle_type] || "🚗";
+  const icon    = vehicleIconHtml[vd.vehicle_type] || '<i class="fa-solid fa-car"></i>';
   const ring    = RING_COLORS[vd.vehicle_type] || "#ef4444";
 
   const statusLabel = { dispatched:"Dispatched", in_progress:"En Route", on_scene:"On Scene" }[vd.status] || vd.status || "Dispatched";
@@ -2125,7 +2127,7 @@ function _updateDispatchPanel(vehicleId) {
   panel.classList.remove("hidden");
   panel.innerHTML = `
     <div class="flex items-center justify-between mb-2">
-      <span class="font-bold text-red-700 text-xs tracking-wide">🚨 ACTIVE RESPONSE</span>
+      <span class="font-bold text-red-700 text-xs tracking-wide"><i class="fa-solid fa-bell-exclamation"></i> ACTIVE RESPONSE</span>
       <span class="text-xs font-bold text-white px-2 py-0.5 rounded-full" style="background:${statusBg}">${statusLabel}</span>
     </div>
     <div class="flex items-center gap-2 mb-3 p-2 bg-white rounded-lg border border-red-200">
@@ -2149,8 +2151,8 @@ function _updateDispatchPanel(vehicleId) {
     </div>
     <div class="flex items-center gap-1 mb-3">${timelineHtml}</div>
     <div class="flex gap-2">
-      <button onclick="focusDispatch('${vehicleId}')" class="flex-1 text-xs font-bold text-white rounded-lg py-1.5 transition" style="background:${ring}">📍 Focus Route</button>
-      <button onclick="focusVehicle('${vehicleId}')" class="flex-1 text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg py-1.5 transition">🚗 Track Unit</button>
+      <button onclick="focusDispatch('${vehicleId}')" class="flex-1 text-xs font-bold text-white rounded-lg py-1.5 transition" style="background:${ring}"><i class="fa-solid fa-location-dot"></i> Focus Route</button>
+      <button onclick="focusVehicle('${vehicleId}')" class="flex-1 text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg py-1.5 transition"><i class="fa-solid fa-car"></i> Track Unit</button>
     </div>
   `;
 }
@@ -2159,14 +2161,14 @@ function _showDispatchResolved(vehicleId) {
   const panel = document.getElementById("dispatch-progress-panel");
   if (!panel) return;
   const vd   = vehicleData[vehicleId] || {};
-  const icon = vehicleIcons[vd.vehicle_type] || "🚗";
+  const icon = vehicleIconHtml[vd.vehicle_type] || '<i class="fa-solid fa-car"></i>';
   panel.classList.remove("hidden");
   panel.style.animation = "none";
   panel.style.borderColor = "#86efac";
   panel.style.background  = "#f0fdf4";
   panel.innerHTML = `
     <div class="text-center py-2">
-      <div class="text-3xl mb-1">✅</div>
+      <div class="text-3xl mb-1"><i class="fa-solid fa-circle-check text-green-600"></i></div>
       <p class="font-bold text-green-700 text-sm">Incident Resolved</p>
       <p class="text-xs text-gray-500 mt-0.5">${icon} ${vd.vehicle_name || vehicleId} is on scene</p>
     </div>`;
@@ -2272,7 +2274,8 @@ async function loadVehicles() {
   }
 }
 
-const vehicleIcons = { police:"🚔", fire:"🚒", ambulance:"🚑" };
+const vehicleIcons    = { police:"🚔", fire:"🚒", ambulance:"🚑" };
+const vehicleIconHtml = { police:'<i class="fa-solid fa-shield-halved"></i>', fire:'<i class="fa-solid fa-fire-flame-curved"></i>', ambulance:'<i class="fa-solid fa-truck-medical"></i>' };
 
 // ── Smooth animated marker movement ──────────────────────
 function animateMarkerTo(vehicleId, newLat, newLng) {
@@ -2386,7 +2389,7 @@ function renderVehicleList(vehicles) {
 
   if (listEl) {
     listEl.innerHTML = vehicles.map(v => {
-      const icon = vehicleIcons[v.vehicle_type] || "🚗";
+      const icon = vehicleIconHtml[v.vehicle_type] || '<i class="fa-solid fa-car"></i>';
       const isBusy = v.vehicle_id === activeDispatchVehicle
         || ["dispatched","in_progress","on_scene"].includes(v.status);
       const statusMap = {
@@ -2534,7 +2537,7 @@ function _doStartAutoSim() {
   if (autoSimRunning) return;
   autoSimRunning = true;
   const btn = document.getElementById("auto-sim-btn");
-  if (btn) { btn.textContent = "⏹ Stop Auto-Simulate"; btn.classList.replace("bg-green-600","bg-red-600"); btn.classList.replace("hover:bg-green-700","hover:bg-red-700"); }
+  if (btn) { btn.innerHTML = '<i class="fa-solid fa-stop"></i> Stop Auto-Simulate'; btn.classList.replace("bg-green-600","bg-red-600"); btn.classList.replace("hover:bg-green-700","hover:bg-red-700"); }
   const statusEl = document.getElementById("auto-sim-status");
   if (statusEl) { statusEl.textContent = "Running ✓"; statusEl.style.color = "#16a34a"; }
 
@@ -2549,7 +2552,7 @@ function stopAutoSim() {
   autoSimRunning = false;
   if (autoSimInterval) { clearInterval(autoSimInterval); autoSimInterval = null; }
   const btn = document.getElementById("auto-sim-btn");
-  if (btn) { btn.textContent = "▶ Start Auto-Simulate"; btn.classList.replace("bg-red-600","bg-green-600"); btn.classList.replace("hover:bg-red-700","hover:bg-green-700"); }
+  if (btn) { btn.innerHTML = '<i class="fa-solid fa-play"></i> Start Auto-Simulate'; btn.classList.replace("bg-red-600","bg-green-600"); btn.classList.replace("hover:bg-red-700","hover:bg-green-700"); }
   const statusEl2 = document.getElementById("auto-sim-status");
   if (statusEl2) { statusEl2.textContent = "Idle"; statusEl2.style.color = ""; }
 }
@@ -2651,7 +2654,7 @@ async function sendSimUpdates(vehicleIds) {
 // ── Simulation update log ───────────────────────────────────
 function addSimLog(vehicleId, lat, lng, source) {
   const vd = vehicleData[vehicleId] || {};
-  const icon = vehicleIcons[vd.vehicle_type] || "🚗";
+  const icon = vehicleIconHtml[vd.vehicle_type] || '<i class="fa-solid fa-car"></i>';
   const name = vd.vehicle_name || vehicleId;
   const time = new Date().toLocaleTimeString("en-GB");
   const srcBadge = source === "ws"
@@ -2908,7 +2911,7 @@ async function checkArrival(vehicleId, lat, lng) {
 
 function showArrivalBanner(vehicleId, incidentType) {
   const vd   = vehicleData[vehicleId] || {};
-  const icon = vehicleIcons[vd.vehicle_type] || "🚗";
+  const icon = vehicleIconHtml[vd.vehicle_type] || '<i class="fa-solid fa-car"></i>';
   const name = vd.vehicle_name || vehicleId;
 
   const banner = document.createElement("div");
@@ -2962,7 +2965,7 @@ async function loadAnalytics() {
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         <!-- Incidents by Type -->
         <div class="card">
-          <h3 class="font-bold text-gray-800 mb-4 text-lg">📊 Incidents by Type</h3>
+          <h3 class="font-bold text-gray-800 mb-4 text-lg"><i class="fa-solid fa-chart-bar"></i> Incidents by Type</h3>
           ${Object.entries(region.by_type || {}).length
             ? Object.entries(region.by_type).map(([type, count]) => `
               <div class="flex justify-between items-center py-2.5 border-b border-gray-100 last:border-0">
@@ -2974,7 +2977,7 @@ async function loadAnalytics() {
 
         <!-- Incidents by Status -->
         <div class="card">
-          <h3 class="font-bold text-gray-800 mb-4 text-lg">📈 Incidents by Status</h3>
+          <h3 class="font-bold text-gray-800 mb-4 text-lg"><i class="fa-solid fa-chart-line"></i> Incidents by Status</h3>
           ${Object.entries(region.by_status || {}).length
             ? Object.entries(region.by_status).map(([status, count]) => {
               const statusColors = {
@@ -2995,7 +2998,7 @@ async function loadAnalytics() {
 
         <!-- Responder Status -->
         <div class="card">
-          <h3 class="font-bold text-gray-800 mb-4 text-lg">🚑 Responder Status</h3>
+          <h3 class="font-bold text-gray-800 mb-4 text-lg"><i class="fa-solid fa-truck-medical"></i> Responder Status</h3>
           ${Object.entries(resource.by_type || {}).length
             ? Object.entries(resource.by_type).map(([type, d]) => `
               <div class="py-3 border-b border-gray-100 last:border-0">
@@ -3016,7 +3019,7 @@ async function loadAnalytics() {
 
         <!-- Deployment Rate -->
         <div class="card">
-          <h3 class="font-bold text-gray-800 mb-4 text-lg">📍 Deployment Rate</h3>
+          <h3 class="font-bold text-gray-800 mb-4 text-lg"><i class="fa-solid fa-location-dot"></i> Deployment Rate</h3>
           <div class="text-center py-4">
             <div class="text-5xl font-bold text-red-600 mb-2">${Math.round(resource.utilization_pct || 0)}%</div>
             <p class="text-gray-600 text-sm mb-4">of available units deployed</p>
@@ -3033,26 +3036,26 @@ async function loadAnalytics() {
 
       <!-- System Status -->
       <div class="card bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200">
-        <h3 class="font-bold text-gray-800 mb-3">💻 System Status</h3>
+        <h3 class="font-bold text-gray-800 mb-3"><i class="fa-solid fa-server"></i> System Status</h3>
         <div class="grid grid-cols-3 gap-4 text-center">
           <div>
             <p class="text-sm text-gray-600">WebSocket</p>
-            <p id="ws-status-text"class="text-lg font-bold text-green-600">🟢 Connected</p>
+            <p id="ws-status-text"class="text-lg font-bold text-green-600"><i class="fa-solid fa-circle-check"></i> Connected</p>
           </div>
           <div>
             <p class="text-sm text-gray-600">Database</p>
-            <p class="text-lg font-bold text-green-600">🟢 Healthy</p>
+            <p class="text-lg font-bold text-green-600"><i class="fa-solid fa-circle-check"></i> Healthy</p>
           </div>
           <div>
             <p class="text-sm text-gray-600">APIs</p>
-            <p class="text-lg font-bold text-green-600">🟢 Online</p>
+            <p class="text-lg font-bold text-green-600"><i class="fa-solid fa-circle-check"></i> Online</p>
           </div>
         </div>
       </div>
     `;
   } catch (err) {
     el.innerHTML = `<div class="bg-red-50 border border-red-200 rounded-lg p-6 text-red-700">
-      <p class="font-bold">⚠️ Failed to load analytics</p>
+      <p class="font-bold"><i class="fa-solid fa-triangle-exclamation"></i> Failed to load analytics</p>
       <p class="text-sm mt-2">${err.message}</p>
     </div>`;
   }
