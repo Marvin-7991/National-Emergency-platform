@@ -984,6 +984,35 @@
         </div>
       </div>
 
+      <!-- ── Delete User Confirmation Modal ───────────────────────── -->
+      <div id="delete-user-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onclick="if(event.target===this)cancelDeleteUser()">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+          <div class="p-6 text-center">
+            <div class="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+              <i class="fa-solid fa-triangle-exclamation text-2xl text-red-600"></i>
+            </div>
+            <h3 class="text-xl font-bold text-gray-800 mb-2">Delete User Account</h3>
+            <p class="text-gray-500 text-sm mb-1">You are about to permanently delete:</p>
+            <p id="delete-user-name-display" class="font-bold text-gray-800 text-base mb-1">—</p>
+            <p id="delete-user-email-display" class="text-gray-500 text-sm mb-5">—</p>
+            <p class="text-xs text-red-600 bg-red-50 rounded-lg px-4 py-2 mb-6">
+              <i class="fa-solid fa-circle-exclamation"></i> This action cannot be undone. The user will lose all access immediately.
+            </p>
+          </div>
+          <div id="delete-user-error" class="hidden mx-6 mb-4 text-sm text-red-700 bg-red-50 rounded-lg px-4 py-2"></div>
+          <div class="flex gap-3 px-6 pb-6">
+            <button onclick="cancelDeleteUser()"
+              class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold py-2.5 rounded-lg transition text-sm">
+              <i class="fa-solid fa-arrow-left"></i> Cancel
+            </button>
+            <button onclick="confirmDeleteUser()"
+              class="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 rounded-lg transition text-sm">
+              <i class="fa-solid fa-trash"></i> Yes, Delete
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- ── TAB 7: My Profile ───────────────────────────────────── -->
       <div id="profile-tab" class="tab-content" style="display:none">
         <div class="mb-6">
@@ -3140,7 +3169,7 @@ async function loadUsers() {
       const joined = new Date(u.created_at).toLocaleDateString("en-GB", { day:"2-digit", month:"short", year:"numeric" });
       const isSelf = u._id === user?.id;
       return `
-      <div class="card hover:shadow-md transition">
+      <div class="card hover:shadow-md transition" data-user-id="${u._id}">
         <div class="flex items-start justify-between mb-3">
           <div class="flex items-center gap-3">
             <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600">
@@ -3148,7 +3177,7 @@ async function loadUsers() {
             </div>
             <div>
               <p class="font-bold text-gray-800 text-sm">${u.name}${isSelf ? ' <span class="text-xs text-gray-400 font-normal">(you)</span>' : ''}</p>
-              <p class="text-xs text-gray-500">${u.email}</p>
+              <p class="text-xs text-gray-500 user-email">${u.email}</p>
             </div>
           </div>
         </div>
@@ -3258,15 +3287,42 @@ async function saveEditUser() {
   }
 }
 
-async function deleteUser(id, name) {
-  if (!confirm(`Delete user "${name}"? This cannot be undone.`)) return;
+let _pendingDeleteUserId   = null;
+let _pendingDeleteUserName = null;
+
+function deleteUser(id, name) {
+  _pendingDeleteUserId   = id;
+  _pendingDeleteUserName = name;
+  document.getElementById("delete-user-name-display").textContent  = name;
+  // look up email from the rendered card for extra context
+  const emailEl = document.querySelector(`[data-user-id="${id}"] .user-email`);
+  document.getElementById("delete-user-email-display").textContent = emailEl ? emailEl.textContent : "";
+  document.getElementById("delete-user-error").classList.add("hidden");
+  document.getElementById("delete-user-modal").classList.remove("hidden");
+}
+
+function cancelDeleteUser() {
+  _pendingDeleteUserId   = null;
+  _pendingDeleteUserName = null;
+  document.getElementById("delete-user-modal").classList.add("hidden");
+}
+
+async function confirmDeleteUser() {
+  if (!_pendingDeleteUserId) return;
+  const errEl = document.getElementById("delete-user-error");
   try {
-    const res = await apiFetch(`${API.auth}/auth/users/${id}`, { method: "DELETE" });
+    const res  = await apiFetch(`${API.auth}/auth/users/${_pendingDeleteUserId}`, { method: "DELETE" });
     const data = await res.json();
-    if (!res.ok) { alert(data.error); return; }
+    if (!res.ok) {
+      errEl.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> ${data.error}`;
+      errEl.classList.remove("hidden");
+      return;
+    }
+    cancelDeleteUser();
     loadUsers();
   } catch (err) {
-    alert(err.message);
+    errEl.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> ${err.message}`;
+    errEl.classList.remove("hidden");
   }
 }
 
