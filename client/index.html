@@ -1584,23 +1584,30 @@ async function submitIncident() {
       ? data.responder[0] : (data.responder || null);
     const responderName = responder?.name || null;
 
-    // ── Calculate travel time from assigned responder position ──────
+    // ── Calculate travel time from assigned vehicle position ────────
+    // Use vehicle coordinates (most accurate) → fall back to responder station
     let travelMs = 60000; // default 1 min
-    if (responder && responder.latitude) {
-      const dist = haversineKm(responder.latitude, responder.longitude, data.latitude, data.longitude);
-      // 1500 ms per km — nearby (~5 km) = ~8 s, cross-region (~100 km) = ~2.5 min, nationwide (~400 km) = ~10 min max
-      travelMs = Math.max(15000, Math.min(600000, dist * 1500));
+    const vLat = data.assigned_vehicle_lat ?? (responder ? responder.latitude  : null);
+    const vLng = data.assigned_vehicle_lng ?? (responder ? responder.longitude : null);
+    if (vLat != null && vLng != null) {
+      const dist = haversineKm(parseFloat(vLat), parseFloat(vLng), data.latitude, data.longitude);
+      // 3000 ms/km: 5 km ≈ 15 s, 8 km ≈ 24 s, 40 km (Kasoa) ≈ 2 min, 100 km ≈ 5 min
+      travelMs = Math.max(10000, Math.min(900000, dist * 3000));
     }
     const etaSec = Math.round(travelMs / 1000);
     const etaStr = etaSec >= 60 ? `${Math.ceil(etaSec/60)} min` : `${etaSec} sec`;
 
-    sucText.innerHTML = `<strong>Incident created!</strong> ${responderName ? `Dispatching <strong>${responderName}</strong> — ETA ~${etaStr}` : '<i class="fa-solid fa-triangle-exclamation"></i> No available responder found nearby.'}`;
+    // Prefer the vehicle's friendly name; fall back to responder station name
+    const vehicleName = data.assigned_vehicle_name || data.assigned_vehicle_id || null;
+    const displayName = vehicleName || responderName;
+
+    sucText.innerHTML = `<strong>Incident created!</strong> ${displayName ? `Dispatching <strong>${displayName}</strong> — ETA ~${etaStr}` : '<i class="fa-solid fa-triangle-exclamation"></i> No available responder found nearby.'}`;
     sucEl.classList.remove("hidden");
 
     // Show dispatch info panel
-    if (responderName && data.assigned_vehicle_id) {
+    if (displayName && data.assigned_vehicle_id) {
       document.getElementById("dispatch-info").classList.remove("hidden");
-      document.getElementById("dispatch-unit").innerHTML = `<i class="fa-solid fa-fire-flame-curved"></i> Unit: ${data.assigned_vehicle_id} — ${responderName}`;
+      document.getElementById("dispatch-unit").innerHTML = `<i class="fa-solid fa-fire-flame-curved"></i> Unit: <strong>${vehicleName || data.assigned_vehicle_id}</strong>${responderName ? ` (${responderName})` : ''}`;
       document.getElementById("dispatch-eta").innerHTML = `<i class="fa-regular fa-clock"></i> ETA: ~${etaStr}`;
       const tl = document.getElementById("dispatch-timeline");
       const now = Date.now();
@@ -1646,7 +1653,9 @@ async function submitIncident() {
       // Load vehicles if not yet loaded
       if (!vehicleData[vid]) await loadVehicles();
       const startPos = vehiclePositions[vid]
-        || (responder ? { lat: responder.latitude, lng: responder.longitude } : { lat: incLat, lng: incLng });
+        || (data.assigned_vehicle_lat != null
+            ? { lat: parseFloat(data.assigned_vehicle_lat), lng: parseFloat(data.assigned_vehicle_lng) }
+            : (responder ? { lat: responder.latitude, lng: responder.longitude } : { lat: incLat, lng: incLng }));
       dispatchRoutes[vid] = {
         incidentId: incId.toString(), targetLat: incLat, targetLng: incLng,
         startLat: startPos.lat, startLng: startPos.lng,

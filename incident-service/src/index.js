@@ -176,7 +176,10 @@ app.post("/incidents", authenticate, async (req, res) => {
               vehicle_id: nearestVehicle.vehicle_id,
               incident_id: incident._id.toString()
             });
-            incident.assigned_vehicle_id = nearestVehicle.vehicle_id;
+            incident.assigned_vehicle_id   = nearestVehicle.vehicle_id;
+            incident.assigned_vehicle_name = nearestVehicle.vehicle_name;
+            incident.assigned_vehicle_lat  = nearestVehicle.latitude;
+            incident.assigned_vehicle_lng  = nearestVehicle.longitude;
           }
         }
       } catch (vehicleErr) {
