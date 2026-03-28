@@ -1,8 +1,9 @@
-// Production API URLs — update these with your actual Render service URLs after deploying.
-// Format: https://<service-name>.onrender.com
+// API base URLs — proxied through Vercel to avoid CORS (HTTP requests).
+// dispatchWs is a direct WSS connection (Vercel cannot proxy WebSockets).
 window.ENV = {
-  auth:     "https://national-emergency-platform-auth-api.onrender.com",
-  incident: "https://national-emergency-platform-incident-api.onrender.com",
-  dispatch: "https://national-emergency-platform-dispatch-api.onrender.com",
-  analytics:"https://national-emergency-platform-analytics-api.onrender.com",
+  auth:       "/proxy/auth",
+  incident:   "/proxy/incident",
+  dispatch:   "/proxy/dispatch",
+  analytics:  "/proxy/analytics",
+  dispatchWs: "wss://national-emergency-platform-dispatch-api.onrender.com",
 };

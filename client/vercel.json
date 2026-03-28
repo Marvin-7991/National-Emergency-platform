@@ -1,8 +1,26 @@
 {
   "version": 2,
   "rewrites": [
-    { "source": "/config.js", "destination": "/config.js" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    {
+      "source": "/proxy/auth/:path*",
+      "destination": "https://national-emergency-platform-auth-api.onrender.com/:path*"
+    },
+    {
+      "source": "/proxy/incident/:path*",
+      "destination": "https://national-emergency-platform-incident-api.onrender.com/:path*"
+    },
+    {
+      "source": "/proxy/dispatch/:path*",
+      "destination": "https://national-emergency-platform-dispatch-api.onrender.com/:path*"
+    },
+    {
+      "source": "/proxy/analytics/:path*",
+      "destination": "https://national-emergency-platform-analytics-api.onrender.com/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
   ],
   "headers": [
     {
