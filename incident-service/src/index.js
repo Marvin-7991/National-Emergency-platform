@@ -156,9 +156,9 @@ app.post("/incidents", authenticate, async (req, res) => {
         });
         const vehicles = vehiclesRes.data;
         const typeMap = { police: "police", fire: "fire", ambulance: "ambulance" };
-        const matching = vehicles.filter(v =>
-          v.vehicle_type === typeMap[responderType] && (v.status === "idle" || !v.status)
-        );
+        // Pick nearest vehicle of correct type regardless of current status
+        // (status resets to "idle" when incident resolves)
+        const matching = vehicles.filter(v => v.vehicle_type === typeMap[responderType]);
         if (matching.length > 0) {
           const nearestVehicle = matching.reduce((best, v) => {
             const d = getDistance(
@@ -176,6 +176,11 @@ app.post("/incidents", authenticate, async (req, res) => {
               vehicle_id: nearestVehicle.vehicle_id,
               incident_id: incident._id.toString()
             });
+            // Persist vehicle ID so the resolve handler can reset it to idle
+            await db.collection("incidents").updateOne(
+              { _id: incident._id },
+              { $set: { assigned_vehicle_id: nearestVehicle.vehicle_id } }
+            );
             incident.assigned_vehicle_id   = nearestVehicle.vehicle_id;
             incident.assigned_vehicle_name = nearestVehicle.vehicle_name;
             incident.assigned_vehicle_lat  = nearestVehicle.latitude;
@@ -368,7 +373,7 @@ app.put("/incidents/:id/status", authenticate, async (req, res) => {
       { $set: { status, updated_at: new Date() } }
     );
 
-    // Free up responder and hospital bed when resolved
+    // Free up responder, hospital bed, and vehicle when resolved
     if (status === "resolved") {
       if (incident.assigned_unit) {
         await db.collection("responders").updateOne(
@@ -381,6 +386,17 @@ app.put("/incidents/:id/status", authenticate, async (req, res) => {
           { _id: incident.hospital_id },
           { $inc: { available_beds: 1 } }
         );
+      }
+      // Reset dispatched vehicle back to idle so it can be reassigned
+      if (incident.assigned_vehicle_id) {
+        try {
+          await axios.patch(
+            `${DISPATCH_URL}/vehicles/${incident.assigned_vehicle_id}/status`,
+            { status: "idle" }
+          );
+        } catch (e) {
+          console.warn("Could not reset vehicle status:", e.message);
+        }
       }
     }
 

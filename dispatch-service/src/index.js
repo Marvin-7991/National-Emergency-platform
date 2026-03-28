@@ -142,6 +142,25 @@ app.post("/vehicles/assign", async (req, res) => {
   }
 });
 
+// ── PATCH /vehicles/:id/status (internal reset — no auth needed) ──
+app.patch("/vehicles/:id/status", async (req, res) => {
+  const { status } = req.body;
+  if (!status) return res.status(400).json({ error: "status required" });
+  try {
+    const db = getDB();
+    const vehicle = await db.collection("vehicle_locations").findOneAndUpdate(
+      { vehicle_id: req.params.id },
+      { $set: { status, updated_at: new Date() } },
+      { returnDocument: "after" }
+    );
+    if (!vehicle) return res.status(404).json({ error: "Vehicle not found" });
+    broadcast({ type: "location_update", vehicle });
+    res.json(vehicle);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── PUT /vehicles/:id/location (GPS update) ───────────────
 app.put("/vehicles/:id/location", authenticate, async (req, res) => {
   const { latitude, longitude, status } = req.body;
