@@ -578,7 +578,129 @@ app.put("/hospitals/:id", authenticate, async (req, res) => {
   }
 });
 
+// ── Ghana-wide seed data ──────────────────────────────────
+const SEED_RESPONDERS = [
+  // Greater Accra (3 of each — most populous region)
+  { name: "Accra Central Police HQ",      type: "police",    latitude: 5.5560,  longitude: -0.2010 },
+  { name: "Tema Police Station",           type: "police",    latitude: 5.6698,  longitude: -0.0166 },
+  { name: "Madina Police Station",         type: "police",    latitude: 5.6800,  longitude: -0.1700 },
+  { name: "Accra Fire Service HQ",         type: "fire",      latitude: 5.5519,  longitude: -0.2190 },
+  { name: "Tema Fire Station",             type: "fire",      latitude: 5.6700,  longitude: -0.0200 },
+  { name: "Accra Ambulance Service",       type: "ambulance", latitude: 5.5481,  longitude: -0.2266 },
+  { name: "Tema Ambulance Unit",           type: "ambulance", latitude: 5.6698,  longitude: -0.0180 },
+  // Ashanti — Kumasi
+  { name: "Kumasi Central Police Station", type: "police",    latitude: 6.6885,  longitude: -1.6244 },
+  { name: "Asokwa Police Station",         type: "police",    latitude: 6.6750,  longitude: -1.6100 },
+  { name: "Kumasi Fire Service",           type: "fire",      latitude: 6.6857,  longitude: -1.6239 },
+  { name: "Bantama Fire Station",          type: "fire",      latitude: 6.7050,  longitude: -1.6400 },
+  { name: "Kumasi Ambulance Service",      type: "ambulance", latitude: 6.6857,  longitude: -1.6239 },
+  { name: "Oforikrom Ambulance Unit",      type: "ambulance", latitude: 6.6600,  longitude: -1.5900 },
+  // Western — Takoradi / Sekondi
+  { name: "Takoradi Police Command",       type: "police",    latitude: 4.9016,  longitude: -1.7442 },
+  { name: "Sekondi Police Station",        type: "police",    latitude: 4.9405,  longitude: -1.7068 },
+  { name: "Takoradi Fire Service",         type: "fire",      latitude: 4.8950,  longitude: -1.7500 },
+  { name: "Takoradi Ambulance Unit",       type: "ambulance", latitude: 4.9008,  longitude: -1.7570 },
+  // Central — Cape Coast
+  { name: "Cape Coast Police Command",     type: "police",    latitude: 5.1053,  longitude: -1.2466 },
+  { name: "Cape Coast Fire Station",       type: "fire",      latitude: 5.1000,  longitude: -1.2500 },
+  { name: "Cape Coast Ambulance Service",  type: "ambulance", latitude: 5.1033,  longitude: -1.2870 },
+  // Eastern — Koforidua
+  { name: "Koforidua Police Station",      type: "police",    latitude: 6.0940,  longitude: -0.2570 },
+  { name: "Koforidua Fire Station",        type: "fire",      latitude: 6.0900,  longitude: -0.2600 },
+  { name: "Eastern Region Ambulance",      type: "ambulance", latitude: 6.0880,  longitude: -0.2626 },
+  // Volta — Ho
+  { name: "Ho Municipal Police Station",   type: "police",    latitude: 6.6012,  longitude:  0.4700 },
+  { name: "Ho Fire Station",               type: "fire",      latitude: 6.5980,  longitude:  0.4680 },
+  { name: "Ho Ambulance Unit",             type: "ambulance", latitude: 6.6008,  longitude:  0.4798 },
+  // Oti — Dambai
+  { name: "Dambai Police Station",         type: "police",    latitude: 8.0730,  longitude:  0.1780 },
+  { name: "Dambai Fire Unit",              type: "fire",      latitude: 8.0710,  longitude:  0.1760 },
+  { name: "Oti Ambulance Unit",            type: "ambulance", latitude: 8.0730,  longitude:  0.1780 },
+  // Bono — Sunyani
+  { name: "Sunyani Police Station",        type: "police",    latitude: 7.3349,  longitude: -2.3266 },
+  { name: "Sunyani Fire Station",          type: "fire",      latitude: 7.3320,  longitude: -2.3280 },
+  { name: "Sunyani Ambulance Service",     type: "ambulance", latitude: 7.3389,  longitude: -2.3271 },
+  // Bono East — Techiman
+  { name: "Techiman Police Station",       type: "police",    latitude: 7.5905,  longitude: -1.9380 },
+  { name: "Techiman Fire Unit",            type: "fire",      latitude: 7.5880,  longitude: -1.9400 },
+  { name: "Techiman Ambulance Unit",       type: "ambulance", latitude: 7.5905,  longitude: -1.9380 },
+  // Ahafo — Goaso
+  { name: "Goaso Police Station",          type: "police",    latitude: 6.8060,  longitude: -2.5160 },
+  { name: "Goaso Fire Unit",               type: "fire",      latitude: 6.8040,  longitude: -2.5180 },
+  { name: "Ahafo Ambulance Unit",          type: "ambulance", latitude: 6.8060,  longitude: -2.5160 },
+  // Northern — Tamale
+  { name: "Tamale Central Police Station", type: "police",    latitude: 9.4034,  longitude: -0.8424 },
+  { name: "Yendi Police Station",          type: "police",    latitude: 9.4426,  longitude: -0.0099 },
+  { name: "Tamale Fire Service",           type: "fire",      latitude: 9.4000,  longitude: -0.8450 },
+  { name: "Tamale Ambulance Service",      type: "ambulance", latitude: 9.4076,  longitude: -0.8419 },
+  // Savannah — Damongo
+  { name: "Damongo Police Station",        type: "police",    latitude: 9.0840,  longitude: -1.8220 },
+  { name: "Damongo Fire Unit",             type: "fire",      latitude: 9.0820,  longitude: -1.8240 },
+  { name: "Savannah Ambulance Unit",       type: "ambulance", latitude: 9.0840,  longitude: -1.8220 },
+  // North East — Nalerigu
+  { name: "Nalerigu Police Station",       type: "police",    latitude: 10.5200, longitude: -0.3640 },
+  { name: "Gambaga Fire Unit",             type: "fire",      latitude: 10.5240, longitude: -0.3561 },
+  { name: "North East Ambulance Unit",     type: "ambulance", latitude: 10.5200, longitude: -0.3640 },
+  // Upper East — Bolgatanga
+  { name: "Bolgatanga Police Command",     type: "police",    latitude: 10.7854, longitude: -0.8514 },
+  { name: "Bolgatanga Fire Station",       type: "fire",      latitude: 10.7840, longitude: -0.8530 },
+  { name: "Bolgatanga Ambulance Service",  type: "ambulance", latitude: 10.7869, longitude: -0.8524 },
+  // Upper West — Wa
+  { name: "Wa Police Station",             type: "police",    latitude: 10.0601, longitude: -2.5099 },
+  { name: "Wa Fire Station",               type: "fire",      latitude: 10.0580, longitude: -2.5120 },
+  { name: "Wa Ambulance Unit",             type: "ambulance", latitude: 10.0636, longitude: -2.5058 },
+  // Western North — Sefwi Wiawso
+  { name: "Sefwi Wiawso Police Station",   type: "police",    latitude: 6.2080,  longitude: -2.4860 },
+  { name: "Sefwi Fire Unit",               type: "fire",      latitude: 6.2060,  longitude: -2.4880 },
+  { name: "Western North Ambulance",       type: "ambulance", latitude: 6.2080,  longitude: -2.4860 },
+];
+
+const SEED_HOSPITALS = [
+  { name: "Korle-Bu Teaching Hospital",          latitude: 5.5481,  longitude: -0.2266, capacity: 1800, available_beds: 1200 },
+  { name: "Ridge Hospital Accra",                latitude: 5.5720,  longitude: -0.1980, capacity: 350,  available_beds: 180  },
+  { name: "37 Military Hospital",                latitude: 5.5755,  longitude: -0.1885, capacity: 400,  available_beds: 200  },
+  { name: "Komfo Anokye Teaching Hospital",      latitude: 6.6857,  longitude: -1.6239, capacity: 1000, available_beds: 650  },
+  { name: "Cape Coast Teaching Hospital",        latitude: 5.1033,  longitude: -1.2870, capacity: 480,  available_beds: 300  },
+  { name: "Tamale Teaching Hospital",            latitude: 9.4076,  longitude: -0.8419, capacity: 450,  available_beds: 280  },
+  { name: "Bolgatanga Regional Hospital",        latitude: 10.7869, longitude: -0.8524, capacity: 300,  available_beds: 190  },
+  { name: "Wa Regional Hospital",                latitude: 10.0636, longitude: -2.5058, capacity: 250,  available_beds: 150  },
+  { name: "Ho Teaching Hospital",                latitude: 6.6008,  longitude:  0.4798, capacity: 380,  available_beds: 230  },
+  { name: "Takoradi Hospital",                   latitude: 4.9008,  longitude: -1.7570, capacity: 320,  available_beds: 200  },
+  { name: "Koforidua Regional Hospital",         latitude: 6.0880,  longitude: -0.2626, capacity: 280,  available_beds: 170  },
+  { name: "Sunyani Regional Hospital",           latitude: 7.3389,  longitude: -2.3271, capacity: 260,  available_beds: 160  },
+  { name: "Techiman Holy Family Hospital",       latitude: 7.5905,  longitude: -1.9380, capacity: 200,  available_beds: 130  },
+  { name: "Navrongo War Memorial Hospital",      latitude: 10.8941, longitude: -1.0930, capacity: 160,  available_beds: 100  },
+  { name: "Damongo District Hospital",           latitude: 9.0840,  longitude: -1.8220, capacity: 120,  available_beds: 80   },
+  { name: "Dambai Government Hospital",          latitude: 8.0730,  longitude:  0.1780, capacity: 100,  available_beds: 65   },
+  { name: "Goaso Government Hospital",           latitude: 6.8060,  longitude: -2.5160, capacity: 140,  available_beds: 90   },
+  { name: "Sefwi Wiawso Government Hospital",    latitude: 6.2080,  longitude: -2.4860, capacity: 110,  available_beds: 70   },
+];
+
+async function seedIfEmpty() {
+  try {
+    const db = getDB();
+    const responderCount = await db.collection("responders").countDocuments();
+    if (responderCount === 0) {
+      await db.collection("responders").insertMany(
+        SEED_RESPONDERS.map(r => ({ ...r, is_available: true, created_at: new Date() }))
+      );
+      console.log(`Seeded ${SEED_RESPONDERS.length} responders across all 16 Ghana regions`);
+    }
+    const hospitalCount = await db.collection("hospitals").countDocuments();
+    if (hospitalCount === 0) {
+      await db.collection("hospitals").insertMany(
+        SEED_HOSPITALS.map(h => ({ ...h, created_at: new Date() }))
+      );
+      console.log(`Seeded ${SEED_HOSPITALS.length} hospitals`);
+    }
+  } catch (err) {
+    console.error("Seed error:", err.message);
+  }
+}
+
 const PORT = process.env.PORT || 3002;
 
 app.listen(PORT, () => console.log(`Incident service running on port ${PORT}`));
-Promise.all([initDB(), connect()]).catch(err => console.error("Failed to initialize:", err));
+Promise.all([initDB(), connect()])
+  .then(seedIfEmpty)
+  .catch(err => console.error("Failed to initialize:", err));
