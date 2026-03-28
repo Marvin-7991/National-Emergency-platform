@@ -22,6 +22,7 @@ app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 app.use(express.json());
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+app.get("/health", (req, res) => res.json({ status: "ok", service: "auth" }));
 
 const JWT_SECRET = process.env.JWT_SECRET;
 

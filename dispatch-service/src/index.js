@@ -24,6 +24,7 @@ app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 app.use(express.json());
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+app.get("/health", (req, res) => res.json({ status: "ok", service: "dispatch" }));
 
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
