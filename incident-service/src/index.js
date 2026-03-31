@@ -453,6 +453,50 @@ app.put("/incidents/:id/assign", authenticate, async (req, res) => {
   }
 });
 
+// ── PUT /incidents/:id/hospital ──────────────────────────
+app.put("/incidents/:id/hospital", authenticate, async (req, res) => {
+  const { hospital_id } = req.body;
+  if (!hospital_id)
+    return res.status(400).json({ error: "hospital_id required" });
+
+  try {
+    const db = getDB();
+    const incident = await db.collection("incidents").findOne({ _id: new ObjectId(req.params.id) });
+    if (!incident) return res.status(404).json({ error: "Incident not found" });
+
+    const hospital = await db.collection("hospitals").findOne({ _id: new ObjectId(hospital_id) });
+    if (!hospital) return res.status(404).json({ error: "Hospital not found" });
+    if (hospital.available_beds <= 0)
+      return res.status(400).json({ error: "Hospital has no available capacity" });
+
+    // If already assigned to a different hospital, restore its bed
+    if (incident.hospital_id && incident.hospital_id.toString() !== hospital_id) {
+      await db.collection("hospitals").updateOne(
+        { _id: incident.hospital_id },
+        { $inc: { available_beds: 1 } }
+      );
+    }
+
+    // Assign hospital and decrement capacity only if not already assigned to this hospital
+    if (!incident.hospital_id || incident.hospital_id.toString() !== hospital_id) {
+      await db.collection("hospitals").updateOne(
+        { _id: new ObjectId(hospital_id) },
+        { $inc: { available_beds: -1 } }
+      );
+    }
+
+    await db.collection("incidents").updateOne(
+      { _id: new ObjectId(req.params.id) },
+      { $set: { hospital_id: new ObjectId(hospital_id), updated_at: new Date() } }
+    );
+
+    const updated = await db.collection("incidents").findOne({ _id: new ObjectId(req.params.id) });
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── DELETE /incidents/:id ─────────────────────────────────
 app.delete("/incidents/:id", authenticate, async (req, res) => {
   try {
