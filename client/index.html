@@ -735,11 +735,6 @@
             <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2"><i class="fa-solid fa-shield-halved"></i> Responder Stations</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
               <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-2">Unit Name</label>
-                <input id="new-responder-name" type="text" placeholder="e.g., Accra Central Police Station"
-                  class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition"/>
-              </div>
-              <div>
                 <label class="block text-sm font-semibold text-gray-700 mb-2">Responder Type</label>
                 <select id="new-responder-type"
                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition">
@@ -809,8 +804,6 @@
                 <p class="text-sm font-bold text-gray-800 mb-4"><i class="fa-solid fa-car"></i> Vehicle Registration</p>
                 <div class="space-y-3">
                   <input id="vehicle-id" type="text" placeholder="Vehicle ID (e.g., TAM-AMB-03)"
-                    class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition"/>
-                  <input id="vehicle-name" type="text" placeholder="Vehicle name (e.g., Tamale Ambulance 3)"
                     class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition"/>
                   <select id="vehicle-type"
                     class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition">
@@ -1984,12 +1977,7 @@ async function loadHospitals() {
             <div class="bg-${healthColor}-500 h-full transition-all" style="width: ${pct}%"></div>
           </div>
         </div>
-        <div class="flex gap-2">
-          <button onclick="adjustHospitalBeds('${h._id}', 1)"
-            class="flex-1 px-2 py-1.5 text-xs bg-green-100 text-green-800 rounded hover:bg-green-200 transition font-semibold">+1 Bed</button>
-          <button onclick="adjustHospitalBeds('${h._id}', -1)"
-            class="flex-1 px-2 py-1.5 text-xs bg-red-100 text-red-800 rounded hover:bg-red-200 transition font-semibold">-1 Bed</button>
-        </div>
+        <p class="text-xs text-gray-400 italic">Capacity is fixed. Available beds update automatically when incidents are assigned or resolved.</p>
       </div>
     `; }).join("");
   } catch (err) {
@@ -2032,25 +2020,6 @@ async function createHospital() {
   }
 }
 
-async function adjustHospitalBeds(id, delta) {
-  const card = document.querySelector(`[data-hospital-id="${id}"]`);
-  if (!card) return;
-  const updated = Math.max(0, parseInt(card.dataset.available || "0", 10) + delta);
-  try {
-    await apiFetch(`${API.incident}/hospitals/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ available_beds: updated }),
-    });
-    loadHospitals();
-  } catch (err) {
-    const errEl = document.getElementById("report-error");
-    const errText = document.getElementById("report-error-text");
-    errText.innerHTML = `<strong><i class="fa-solid fa-circle-xmark"></i> Failed to update capacity:</strong> ${err.message}`;
-    errEl.classList.remove("hidden");
-    setTimeout(() => errEl.classList.add("hidden"), 5000);
-  }
-}
 
 // ── Responders ────────────────────────────────────────────
 async function loadResponders() {
@@ -2093,26 +2062,30 @@ async function loadResponders() {
 }
 
 async function addResponder() {
-  const name      = document.getElementById("new-responder-name").value.trim();
   const type      = document.getElementById("new-responder-type").value;
   const latitude  = parseFloat(document.getElementById("new-responder-lat").value);
   const longitude = parseFloat(document.getElementById("new-responder-lon").value);
 
-  if (!name || !type || isNaN(latitude) || isNaN(longitude)) {
+  if (!type || isNaN(latitude) || isNaN(longitude)) {
     const errEl = document.getElementById("report-error");
     const errText = document.getElementById("report-error-text");
-    errText.innerHTML = `<strong><i class="fa-solid fa-circle-xmark"></i> Please fill all fields and pick a station location on the map.</strong>`;
+    errText.innerHTML = `<strong><i class="fa-solid fa-circle-xmark"></i> Please select a type and pick a station location on the map.</strong>`;
     errEl.classList.remove("hidden");
     setTimeout(() => errEl.classList.add("hidden"), 5000);
     return;
   }
   try {
+    // Auto-generate sequential name based on existing count for this type
+    const allRes = await apiFetch(`${API.incident}/responders`);
+    const all = await allRes.json();
+    const prefix = { police: "POL", fire: "FIRE", ambulance: "AMB" }[type] || type.toUpperCase();
+    const count = Array.isArray(all) ? all.filter(r => r.type === type).length : 0;
+    const name = `${prefix}-${count + 1}`;
     await apiFetch(`${API.incident}/responders`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, type, latitude, longitude }),
     });
-    document.getElementById("new-responder-name").value = "";
     document.getElementById("new-responder-lat").value  = "";
     document.getElementById("new-responder-lon").value  = "";
     document.getElementById("responder-loc-pill").classList.add("hidden");
@@ -2129,17 +2102,22 @@ async function addResponder() {
 // ── Vehicle / Driver ──────────────────────────────────────
 async function registerVehicle() {
   const vehicleId   = document.getElementById("vehicle-id").value.trim();
-  const vehicleName = document.getElementById("vehicle-name").value.trim();
   const vehicleType = document.getElementById("vehicle-type").value;
   const latitude    = parseFloat(document.getElementById("vehicle-lat").value);
   const longitude   = parseFloat(document.getElementById("vehicle-lon").value);
 
-  if (!vehicleId || !vehicleName || isNaN(latitude) || isNaN(longitude)) {
+  if (!vehicleId || isNaN(latitude) || isNaN(longitude)) {
     const driverStatus = document.getElementById("driver-status");
-    driverStatus.innerHTML = `<span class="text-red-600"><strong><i class="fa-solid fa-circle-xmark"></i> Error:</strong> Please fill all fields and pick a starting location on the map.</span>`;
+    driverStatus.innerHTML = `<span class="text-red-600"><strong><i class="fa-solid fa-circle-xmark"></i> Error:</strong> Please enter a Vehicle ID and pick a starting location on the map.</span>`;
     return;
   }
   try {
+    // Auto-generate sequential vehicle name based on existing count for this type
+    const allRes = await apiFetch(`${API.dispatch}/vehicles`);
+    const allVehicles = await allRes.json();
+    const prefix = { police: "POL", fire: "FIRE", ambulance: "AMB" }[vehicleType] || vehicleType.toUpperCase();
+    const count = Array.isArray(allVehicles) ? allVehicles.filter(v => v.vehicle_type === vehicleType).length : 0;
+    const vehicleName = `${prefix}-${count + 1}`;
     const res = await apiFetch(`${API.dispatch}/vehicles/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -2159,7 +2137,6 @@ async function registerVehicle() {
     
     // Reset the form
     document.getElementById("vehicle-id").value = "";
-    document.getElementById("vehicle-name").value = "";
     document.getElementById("vehicle-type").value = "ambulance";
     document.getElementById("vehicle-lat").value = "";
     document.getElementById("vehicle-lon").value = "";
