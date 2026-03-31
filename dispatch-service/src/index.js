@@ -489,6 +489,31 @@ async function migrateVehicleHomeLocations() {
   }
 }
 
+async function migrateVehicleNames() {
+  try {
+    const db = getDB();
+    const prefixMap = { police: "POL", fire: "FIRE", ambulance: "AMB" };
+    for (const [type, prefix] of Object.entries(prefixMap)) {
+      const vehicles = await db.collection("vehicle_locations")
+        .find({ vehicle_type: type })
+        .sort({ vehicle_id: 1 })
+        .toArray();
+      for (let i = 0; i < vehicles.length; i++) {
+        const expectedName = `${prefix}-${i + 1}`;
+        if (vehicles[i].vehicle_name !== expectedName) {
+          await db.collection("vehicle_locations").updateOne(
+            { _id: vehicles[i]._id },
+            { $set: { vehicle_name: expectedName } }
+          );
+        }
+      }
+    }
+    console.log("Vehicle name migration complete");
+  } catch (err) {
+    console.error("Vehicle name migration error:", err.message);
+  }
+}
+
 const PORT = process.env.PORT || 3003;
 
 server.listen(PORT, () => console.log(`Dispatch service running on port ${PORT}`));
@@ -496,4 +521,5 @@ Promise.all([initDB(), connect()]).then(async () => {
   await subscribeToEvent(EVENTS.INCIDENT_ASSIGNED, handleIncidentAssigned, 'incidents');
   await seedVehiclesIfEmpty();
   await migrateVehicleHomeLocations();
+  await migrateVehicleNames();
 }).catch(err => console.error("Failed to initialize:", err));

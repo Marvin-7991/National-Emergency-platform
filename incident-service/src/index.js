@@ -119,21 +119,19 @@ app.post("/incidents", authenticate, async (req, res) => {
     const responderType = incidentTypeToResponder(incident_type);
     const nearest = await findNearestResponder(latitude, longitude, responderType);
 
-    // Auto-assign hospital for medical emergencies
-    if (responderType === "ambulance") {
-      const hospital = await findNearestHospital(latitude, longitude);
-      if (hospital) {
-        await db.collection("hospitals").updateOne(
-          { _id: hospital._id },
-          { $inc: { available_beds: -1 } }
-        );
-        await db.collection("incidents").updateOne(
-          { _id: incident._id },
-          { $set: { hospital_id: hospital._id } }
-        );
-        incident.hospital_id = hospital._id;
-        incident.hospital = hospital;
-      }
+    // Auto-assign nearest hospital for all incident types and decrease available capacity
+    const hospital = await findNearestHospital(latitude, longitude);
+    if (hospital) {
+      await db.collection("hospitals").updateOne(
+        { _id: hospital._id },
+        { $inc: { available_beds: -1 } }
+      );
+      await db.collection("incidents").updateOne(
+        { _id: incident._id },
+        { $set: { hospital_id: hospital._id } }
+      );
+      incident.hospital_id = hospital._id;
+      incident.hospital = hospital;
     }
 
     if (nearest) {
@@ -779,9 +777,35 @@ async function seedIfEmpty() {
   }
 }
 
+async function migrateResponderNames() {
+  try {
+    const db = getDB();
+    const prefixMap = { police: "POL", fire: "FIRE", ambulance: "AMB" };
+    for (const [type, prefix] of Object.entries(prefixMap)) {
+      const responders = await db.collection("responders")
+        .find({ type })
+        .sort({ _id: 1 })
+        .toArray();
+      for (let i = 0; i < responders.length; i++) {
+        const expectedName = `${prefix}-${i + 1}`;
+        if (responders[i].name !== expectedName) {
+          await db.collection("responders").updateOne(
+            { _id: responders[i]._id },
+            { $set: { name: expectedName } }
+          );
+        }
+      }
+    }
+    console.log("Responder name migration complete");
+  } catch (err) {
+    console.error("Responder name migration error:", err.message);
+  }
+}
+
 const PORT = process.env.PORT || 3002;
 
 app.listen(PORT, () => console.log(`Incident service running on port ${PORT}`));
 Promise.all([initDB(), connect()])
   .then(seedIfEmpty)
+  .then(migrateResponderNames)
   .catch(err => console.error("Failed to initialize:", err));
