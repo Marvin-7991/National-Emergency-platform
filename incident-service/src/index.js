@@ -441,6 +441,21 @@ app.put("/incidents/:id/assign", authenticate, async (req, res) => {
     const incident = await db.collection("incidents").findOne({ _id: new ObjectId(req.params.id) });
     if (!incident) return res.status(404).json({ error: "Incident not found" });
 
+    // Auto-assign nearest hospital and decrease its capacity by 1
+    if (!incident.hospital_id) {
+      const hospital = await findNearestHospital(incident.latitude, incident.longitude);
+      if (hospital) {
+        await db.collection("hospitals").updateOne(
+          { _id: hospital._id },
+          { $inc: { available_beds: -1 } }
+        );
+        await db.collection("incidents").updateOne(
+          { _id: incident._id },
+          { $set: { hospital_id: hospital._id } }
+        );
+      }
+    }
+
     await publishEvent(EVENTS.INCIDENT_ASSIGNED, {
       incident_id: incident._id.toString(),
       responder_id,
