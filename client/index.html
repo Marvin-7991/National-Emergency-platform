@@ -1569,9 +1569,9 @@ async function submitIncident() {
   errEl.classList.add("hidden");
 
   try {
-    const res = await fetch(`${API.incident}/incidents`, {
+    const res = await apiFetch(`${API.incident}/incidents`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
     const data = await res.json();
@@ -1637,8 +1637,8 @@ async function submitIncident() {
       // → in_progress: when vehicle departs (5% of travel time, min 2s)
       setTimeout(async () => {
         try {
-          await fetch(`${API.incident}/incidents/${incId}/status`, {
-            method: "PUT", headers: { "Content-Type":"application/json", Authorization:`Bearer ${token}` },
+          await apiFetch(`${API.incident}/incidents/${incId}/status`, {
+            method: "PUT", headers: { "Content-Type":"application/json" },
             body: JSON.stringify({ status: "in_progress" })
           });
           loadIncidents();
@@ -1649,8 +1649,8 @@ async function submitIncident() {
       // (simulation's checkArrival also sets this — this is a fallback timer)
       setTimeout(async () => {
         try {
-          await fetch(`${API.incident}/incidents/${incId}/status`, {
-            method: "PUT", headers: { "Content-Type":"application/json", Authorization:`Bearer ${token}` },
+          await apiFetch(`${API.incident}/incidents/${incId}/status`, {
+            method: "PUT", headers: { "Content-Type":"application/json" },
             body: JSON.stringify({ status: "on_scene" })
           });
           loadIncidents();
@@ -1660,8 +1660,8 @@ async function submitIncident() {
       // → resolved: after type-dependent delay once on scene
       setTimeout(async () => {
         try {
-          await fetch(`${API.incident}/incidents/${incId}/status`, {
-            method: "PUT", headers: { "Content-Type":"application/json", Authorization:`Bearer ${token}` },
+          await apiFetch(`${API.incident}/incidents/${incId}/status`, {
+            method: "PUT", headers: { "Content-Type":"application/json" },
             body: JSON.stringify({ status: "resolved" })
           });
           loadIncidents();
@@ -1738,8 +1738,7 @@ async function loadIncidents() {
   const el = document.getElementById("incidents-list");
   try {
     // Use /all so resolved incidents remain visible in the log
-    const res = await fetch(`${API.incident}/incidents/all`,
-      { headers: { Authorization: `Bearer ${token}` } });
+    const res = await apiFetch(`${API.incident}/incidents/all`);
     const data = await res.json();
 
     if (!Array.isArray(data) || !data.length) {
@@ -1850,9 +1849,9 @@ function updateIncidentStats(incidents) {
 
 async function updateStatus(id, status) {
   if (!status) return;
-  await fetch(`${API.incident}/incidents/${id}/status`, {
+  await apiFetch(`${API.incident}/incidents/${id}/status`, {
     method: "PUT",
-    headers: { "Content-Type":"application/json", "Authorization":`Bearer ${token}` },
+    headers: { "Content-Type":"application/json" },
     body: JSON.stringify({ status }),
   });
   loadIncidents();
@@ -1890,9 +1889,8 @@ async function confirmDelete() {
   
   // Perform deletion
   try {
-    const res = await fetch(`${API.incident}/incidents/${pendingDeleteId}`, {
+    const res = await apiFetch(`${API.incident}/incidents/${pendingDeleteId}`, {
       method: "DELETE",
-      headers: { "Authorization":`Bearer ${token}` },
     });
     
     const errEl = document.getElementById("report-error");
@@ -1957,8 +1955,7 @@ function loadManageTab() {
 async function loadHospitals() {
   const el = document.getElementById("hospitals-list");
   try {
-    const res = await fetch(`${API.incident}/hospitals`,
-      { headers: { Authorization: `Bearer ${token}` } });
+    const res = await apiFetch(`${API.incident}/hospitals`);
     const data = await res.json();
     if (!Array.isArray(data) || !data.length) {
       el.innerHTML = `<p class="text-gray-400 text-sm col-span-full text-center py-8">No hospitals registered yet. Add one to get started.</p>`;
@@ -2015,9 +2012,9 @@ async function createHospital() {
     return;
   }
   try {
-    await fetch(`${API.incident}/hospitals`, {
+    await apiFetch(`${API.incident}/hospitals`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, latitude, longitude, capacity: beds, available_beds: beds }),
     });
     document.getElementById("new-hospital-name").value = "";
@@ -2040,9 +2037,9 @@ async function adjustHospitalBeds(id, delta) {
   if (!card) return;
   const updated = Math.max(0, parseInt(card.dataset.available || "0", 10) + delta);
   try {
-    await fetch(`${API.incident}/hospitals/${id}`, {
+    await apiFetch(`${API.incident}/hospitals/${id}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ available_beds: updated }),
     });
     loadHospitals();
@@ -2059,8 +2056,7 @@ async function adjustHospitalBeds(id, delta) {
 async function loadResponders() {
   const el = document.getElementById("responders-list");
   try {
-    const res = await fetch(`${API.incident}/responders`,
-      { headers: { Authorization: `Bearer ${token}` } });
+    const res = await apiFetch(`${API.incident}/responders`);
     const data = await res.json();
     if (!Array.isArray(data) || !data.length) {
       el.innerHTML = `<p class="text-gray-400 text-sm col-span-full text-center py-8">No responders registered yet. Add one to get started.</p>`;
@@ -2111,9 +2107,9 @@ async function addResponder() {
     return;
   }
   try {
-    await fetch(`${API.incident}/responders`, {
+    await apiFetch(`${API.incident}/responders`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, type, latitude, longitude }),
     });
     document.getElementById("new-responder-name").value = "";
@@ -2144,9 +2140,9 @@ async function registerVehicle() {
     return;
   }
   try {
-    const res = await fetch(`${API.dispatch}/vehicles/register`, {
+    const res = await apiFetch(`${API.dispatch}/vehicles/register`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ vehicle_id: vehicleId, vehicle_name: vehicleName, vehicle_type: vehicleType, latitude, longitude }),
     });
     const data = await res.json();
@@ -2189,9 +2185,9 @@ async function updateVehicleLocation() {
     return;
   }
   try {
-    const res = await fetch(`${API.dispatch}/vehicles/${vehicleId}/location`, {
+    const res = await apiFetch(`${API.dispatch}/vehicles/${vehicleId}/location`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ latitude, longitude, status }),
     });
     const data = await res.json();
@@ -2511,8 +2507,7 @@ function fitAllVehicles() {
 
 async function loadVehicles() {
   try {
-    const res = await fetch(`${API.dispatch}/vehicles`,
-      { headers: { Authorization: `Bearer ${token}` } });
+    const res = await apiFetch(`${API.dispatch}/vehicles`);
     if (!res.ok) throw new Error("Dispatch service error");
     const vehicles = await res.json();
     renderVehicles(vehicles);
@@ -2851,9 +2846,9 @@ async function sendSimUpdates(vehicleIds) {
       if (!route.inProgress && rawProg > 0.02) {
         route.inProgress = true;
         newStatus = "in_progress";
-        fetch(`${API.incident}/incidents/${route.incidentId}/status`, {
+        apiFetch(`${API.incident}/incidents/${route.incidentId}/status`, {
           method: "PUT",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ status: "in_progress" }),
         }).catch(() => {});
         loadIncidents();
@@ -2862,9 +2857,9 @@ async function sendSimUpdates(vehicleIds) {
 
     try {
       // Push new position to dispatch DB
-      await fetch(`${API.dispatch}/vehicles/${id}/location`, {
+      await apiFetch(`${API.dispatch}/vehicles/${id}/location`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ latitude: newLat, longitude: newLng, status: newStatus }),
       });
 
@@ -2934,8 +2929,7 @@ function clearSimLog() {
 async function loadIncidentsOverlay() {
   if (!trackingMap) return;
   try {
-    const res = await fetch(`${API.incident}/incidents/open`,
-      { headers: { Authorization: `Bearer ${token}` } });
+    const res = await apiFetch(`${API.incident}/incidents/open`);
     if (!res.ok) return;
     const incidents = await res.json();
 
@@ -3124,18 +3118,18 @@ async function checkArrival(vehicleId, lat, lng) {
 
   // Update incident status → on_scene (vehicle has arrived)
   try {
-    await fetch(`${API.incident}/incidents/${route.incidentId}/status`, {
+    await apiFetch(`${API.incident}/incidents/${route.incidentId}/status`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "on_scene" }),
     });
   } catch {}
 
   // Update vehicle status → on_scene
   try {
-    await fetch(`${API.dispatch}/vehicles/${vehicleId}/location`, {
+    await apiFetch(`${API.dispatch}/vehicles/${vehicleId}/location`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ latitude: lat, longitude: lng, status: "on_scene" }),
     });
     vehicleData[vehicleId] = { ...(vehicleData[vehicleId] || {}), status: "on_scene" };
@@ -3159,9 +3153,9 @@ async function checkArrival(vehicleId, lat, lng) {
   // → resolved: after type-dependent delay
   setTimeout(async () => {
     try {
-      await fetch(`${API.incident}/incidents/${route.incidentId}/status`, {
+      await apiFetch(`${API.incident}/incidents/${route.incidentId}/status`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "resolved" }),
       });
       // Update map marker to resolved
