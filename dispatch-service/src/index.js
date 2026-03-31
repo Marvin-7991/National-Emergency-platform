@@ -452,10 +452,48 @@ async function seedVehiclesIfEmpty() {
   }
 }
 
+/**
+ * One-time migration: for vehicles that existed before the home_latitude field
+ * was introduced, copy their current coordinates to home_latitude/home_longitude.
+ * Also tries to infer a better home from the vehicle name if the stored position
+ * is exactly 0,0 (never had real GPS).
+ */
+async function migrateVehicleHomeLocations() {
+  try {
+    const db = getDB();
+    const vehicles = await db.collection("vehicle_locations")
+      .find({ home_latitude: { $exists: false } })
+      .toArray();
+
+    if (vehicles.length === 0) return;
+
+    console.log(`Migrating home locations for ${vehicles.length} vehicles…`);
+    for (const v of vehicles) {
+      let homeLat = v.latitude  || 0;
+      let homeLng = v.longitude || 0;
+
+      // If stored position is 0,0 try to infer from name
+      if (!homeLat && !homeLng) {
+        const inferred = extractLocationFromName(v.vehicle_name);
+        if (inferred) { homeLat = inferred.lat; homeLng = inferred.lng; }
+      }
+
+      await db.collection("vehicle_locations").updateOne(
+        { vehicle_id: v.vehicle_id },
+        { $set: { home_latitude: homeLat, home_longitude: homeLng } }
+      );
+    }
+    console.log(`Home-location migration complete for ${vehicles.length} vehicles`);
+  } catch (err) {
+    console.error("Migration error:", err.message);
+  }
+}
+
 const PORT = process.env.PORT || 3003;
 
 server.listen(PORT, () => console.log(`Dispatch service running on port ${PORT}`));
 Promise.all([initDB(), connect()]).then(async () => {
   await subscribeToEvent(EVENTS.INCIDENT_ASSIGNED, handleIncidentAssigned, 'incidents');
   await seedVehiclesIfEmpty();
+  await migrateVehicleHomeLocations();
 }).catch(err => console.error("Failed to initialize:", err));

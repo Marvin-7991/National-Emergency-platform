@@ -39,6 +39,7 @@ services:
       MONGODB_URL: ${INCIDENT_MONGODB_URL}
       JWT_SECRET: ${JWT_SECRET}
       RABBITMQ_URL: ${RABBITMQ_URL}
+      DISPATCH_SERVICE_URL: http://dispatch-service:3003
       PORT: 3002
     depends_on:
       rabbitmq:

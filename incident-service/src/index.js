@@ -156,18 +156,22 @@ app.post("/incidents", authenticate, async (req, res) => {
         });
         const vehicles = vehiclesRes.data;
         const typeMap = { police: "police", fire: "fire", ambulance: "ambulance" };
-        // Pick nearest vehicle of correct type regardless of current status
-        // (status resets to "idle" when incident resolves)
-        const matching = vehicles.filter(v => v.vehicle_type === typeMap[responderType]);
+        // Prefer idle vehicles of the correct type; fall back to any if none idle.
+        // Use home_latitude/home_longitude for distance so the vehicle whose base
+        // is nearest to the incident is dispatched (the name-based location feature).
+        const allMatchingType = vehicles.filter(v => v.vehicle_type === typeMap[responderType]);
+        const idleMatching    = allMatchingType.filter(v => v.status === "idle");
+        const matching        = idleMatching.length > 0 ? idleMatching : allMatchingType;
         if (matching.length > 0) {
           const nearestVehicle = matching.reduce((best, v) => {
-            const d = getDistance(
-              parseFloat(latitude), parseFloat(longitude),
-              parseFloat(v.latitude) || 0, parseFloat(v.longitude) || 0
-            );
+            // Use home position when available so nearest-base logic is consistent
+            const vLat = parseFloat(v.home_latitude  || v.latitude)  || 0;
+            const vLng = parseFloat(v.home_longitude || v.longitude) || 0;
+            const d = getDistance(parseFloat(latitude), parseFloat(longitude), vLat, vLng);
+            const bLat = best ? parseFloat(best.home_latitude  || best.latitude)  || 0 : 0;
+            const bLng = best ? parseFloat(best.home_longitude || best.longitude) || 0 : 0;
             const bd = best
-              ? getDistance(parseFloat(latitude), parseFloat(longitude),
-                  parseFloat(best.latitude) || 0, parseFloat(best.longitude) || 0)
+              ? getDistance(parseFloat(latitude), parseFloat(longitude), bLat, bLng)
               : Infinity;
             return d < bd ? v : best;
           }, null);
