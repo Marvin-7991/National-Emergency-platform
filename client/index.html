@@ -30,7 +30,8 @@
   }
   .status-created { background: linear-gradient(135deg, #fef3c7, #fcd34d); color: #78350f; }
   .status-dispatched { background: linear-gradient(135deg, #dbeafe, #93c5fd); color: #1e40af; }
-  .status-in_progress { background: linear-gradient(135deg, #d1fae5, #6ee7b7); color: #065f46; }
+  .status-in_progress { background: linear-gradient(135deg, #fed7aa, #fb923c); color: #7c2d12; }
+  .status-on_scene { background: linear-gradient(135deg, #bbf7d0, #4ade80); color: #14532d; }
   .status-resolved { background: linear-gradient(135deg, #d1d5db, #9ca3af); color: #1f2937; }
 
   /* Role badges */
@@ -1610,18 +1611,29 @@ async function submitIncident() {
       document.getElementById("dispatch-unit").innerHTML = `<i class="fa-solid fa-fire-flame-curved"></i> Unit: <strong>${vehicleName || data.assigned_vehicle_id}</strong>${responderName ? ` (${responderName})` : ''}`;
       document.getElementById("dispatch-eta").innerHTML = `<i class="fa-regular fa-clock"></i> ETA: ~${etaStr}`;
       const tl = document.getElementById("dispatch-timeline");
-      const now = Date.now();
       const inProgressMs = Math.max(2000, travelMs * 0.05);
+      const incidentTypeLower = (data.incident_type || "").toLowerCase();
+      const isMedical = incidentTypeLower.includes("medical") || incidentTypeLower.includes("accident") || incidentTypeLower.includes("injury");
+      const resolveDelay = isMedical ? 12000 : (incidentTypeLower.includes("crime") || incidentTypeLower.includes("rob") ? 3000 : 5000);
+      const resolveMs = travelMs + resolveDelay;
+      const resolveSec = Math.round(resolveMs / 1000);
+      const resolveStr = resolveSec >= 60 ? `${Math.ceil(resolveSec/60)} min` : `${resolveSec} sec`;
       tl.innerHTML = `
         <div style="display:flex;align-items:center;gap:6px"><span style="background:#3b82f6;color:#fff;padding:1px 7px;border-radius:8px;font-size:10px">NOW</span> Dispatched ✓</div>
-        <div style="display:flex;align-items:center;gap:6px;color:#6b7280"><span style="background:#d97706;color:#fff;padding:1px 7px;border-radius:8px;font-size:10px">~${Math.round(inProgressMs/1000)}s</span> En Route (In Progress)</div>
-        <div style="display:flex;align-items:center;gap:6px;color:#6b7280"><span style="background:#16a34a;color:#fff;padding:1px 7px;border-radius:8px;font-size:10px">~${etaStr}</span> On Scene (Resolved)</div>`;
+        <div style="display:flex;align-items:center;gap:6px;color:#6b7280"><span style="background:#d97706;color:#fff;padding:1px 7px;border-radius:8px;font-size:10px">~${Math.round(inProgressMs/1000)}s</span> In Progress (En Route)</div>
+        <div style="display:flex;align-items:center;gap:6px;color:#6b7280"><span style="background:#16a34a;color:#fff;padding:1px 7px;border-radius:8px;font-size:10px">~${etaStr}</span> On Scene${isMedical ? " (Ambulance arrived)" : ""}</div>
+        <div style="display:flex;align-items:center;gap:6px;color:#6b7280"><span style="background:#6b7280;color:#fff;padding:1px 7px;border-radius:8px;font-size:10px">~${resolveStr}</span> Resolved${isMedical ? " (Patient transferred)" : ""}</div>`;
     }
 
     const incId = data._id;
 
     // ── Auto-advance status via timed API calls ──────────────────────
     if (incId) {
+      const _incidentTypeLower = (data.incident_type || "").toLowerCase();
+      const _isMedical = _incidentTypeLower.includes("medical") || _incidentTypeLower.includes("accident") || _incidentTypeLower.includes("injury");
+      // resolve delay after on_scene: medical = 12s (hospital transfer), crime/robbery = 3s, others = 5s
+      const _resolveDelay = _isMedical ? 12000 : (_incidentTypeLower.includes("crime") || _incidentTypeLower.includes("rob") ? 3000 : 5000);
+
       // → in_progress: when vehicle departs (5% of travel time, min 2s)
       setTimeout(async () => {
         try {
@@ -1633,7 +1645,19 @@ async function submitIncident() {
         } catch {}
       }, Math.max(2000, travelMs * 0.05));
 
-      // → resolved: when vehicle arrives
+      // → on_scene: when vehicle arrives at location
+      // (simulation's checkArrival also sets this — this is a fallback timer)
+      setTimeout(async () => {
+        try {
+          await fetch(`${API.incident}/incidents/${incId}/status`, {
+            method: "PUT", headers: { "Content-Type":"application/json", Authorization:`Bearer ${token}` },
+            body: JSON.stringify({ status: "on_scene" })
+          });
+          loadIncidents();
+        } catch {}
+      }, travelMs);
+
+      // → resolved: after type-dependent delay once on scene
       setTimeout(async () => {
         try {
           await fetch(`${API.incident}/incidents/${incId}/status`, {
@@ -1643,7 +1667,7 @@ async function submitIncident() {
           loadIncidents();
           document.getElementById("dispatch-info").classList.add("hidden");
         } catch {}
-      }, travelMs);
+      }, travelMs + _resolveDelay);
     }
 
     // ── Route the assigned vehicle on the tracking map immediately ───
@@ -1758,7 +1782,8 @@ async function loadIncidents() {
              class="border border-gray-300 rounded-lg px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-red-500">
              <option value="">📋 Update Status...</option>
              <option value="dispatched">🔵 Dispatched</option>
-             <option value="in_progress">🟡 In Progress</option>
+             <option value="in_progress">🟠 In Progress</option>
+             <option value="on_scene">🟢 On Scene</option>
              <option value="resolved">✅ Resolved</option>
            </select>`;
 
@@ -2256,8 +2281,9 @@ function buildIncidentBeaconIcon(inc) {
     "Road Accident":"🚧","Crime":"👮","Explosion":"💥","Flood":"🌊","Other":"⚠️"
   }[inc.incident_type] || "🚨";
   const isActive = inc.status === "dispatched" || inc.status === "in_progress";
+  const isOnScene = inc.status === "on_scene";
   const isResolved = inc.status === "resolved";
-  const ringColor = isResolved ? "#16a34a" : "#dc2626";
+  const ringColor = isResolved ? "#16a34a" : isOnScene ? "#16a34a" : "#dc2626";
   const size = isActive ? 36 : 26;
   const rings = isActive ? `
     <div style="position:absolute;width:72px;height:72px;border-radius:50%;background:${ringColor}18;animation:incidentBeaconPulse 1.4s ease-out infinite;pointer-events:none"></div>
@@ -2265,8 +2291,8 @@ function buildIncidentBeaconIcon(inc) {
   return L.divIcon({
     html: `<div style="position:relative;width:72px;height:72px;display:flex;align-items:center;justify-content:center">
       ${rings}
-      <div style="font-size:${size}px;position:relative;z-index:2;filter:drop-shadow(0 2px 10px ${ringColor}bb);line-height:1">${isResolved ? "✅" : typeEmoji}</div>
-      <div style="position:absolute;top:74px;left:50%;transform:translateX(-50%);white-space:nowrap;background:${ringColor};color:#fff;font-size:9px;font-weight:800;padding:2px 8px;border-radius:4px;z-index:3;max-width:120px;overflow:hidden;text-overflow:ellipsis">${isResolved ? "Resolved" : inc.incident_type}</div>
+      <div style="font-size:${size}px;position:relative;z-index:2;filter:drop-shadow(0 2px 10px ${ringColor}bb);line-height:1">${isResolved ? "✅" : isOnScene ? "📍" : typeEmoji}</div>
+      <div style="position:absolute;top:74px;left:50%;transform:translateX(-50%);white-space:nowrap;background:${ringColor};color:#fff;font-size:9px;font-weight:800;padding:2px 8px;border-radius:4px;z-index:3;max-width:120px;overflow:hidden;text-overflow:ellipsis">${isResolved ? "Resolved" : isOnScene ? "On Scene" : inc.incident_type}</div>
     </div>`,
     className: "", iconAnchor: [36, 36]
   });
@@ -2329,14 +2355,15 @@ function _updateDispatchPanel(vehicleId) {
   const icon    = vehicleIconHtml[vd.vehicle_type] || '<i class="fa-solid fa-car"></i>';
   const ring    = RING_COLORS[vd.vehicle_type] || "#ef4444";
 
-  const statusLabel = { dispatched:"Dispatched", in_progress:"En Route", on_scene:"On Scene" }[vd.status] || vd.status || "Dispatched";
-  const statusBg    = { dispatched:"#3b82f6", in_progress:"#d97706", on_scene:"#16a34a" }[vd.status] || "#6b7280";
+  const statusLabel = { dispatched:"Dispatched", in_progress:"En Route", on_scene:"On Scene", resolved:"Resolved" }[vd.status] || vd.status || "Dispatched";
+  const statusBg    = { dispatched:"#3b82f6", in_progress:"#d97706", on_scene:"#16a34a", resolved:"#6b7280" }[vd.status] || "#6b7280";
 
-  // Three-step timeline
+  // Four-step timeline
   const steps = [
     { label:"Dispatched", done: true },
-    { label:"En Route",   done: route.inProgress },
-    { label:"On Scene",   done: false }
+    { label:"En Route",   done: route.inProgress || route.arrived },
+    { label:"On Scene",   done: route.arrived },
+    { label:"Resolved",   done: false }
   ];
   const timelineHtml = steps.map((s, i) => `
     <div style="display:flex;align-items:center;gap:4px;font-size:10px">
@@ -2389,8 +2416,8 @@ function _showDispatchResolved(vehicleId) {
   panel.innerHTML = `
     <div class="text-center py-2">
       <div class="text-3xl mb-1"><i class="fa-solid fa-circle-check text-green-600"></i></div>
-      <p class="font-bold text-green-700 text-sm">Incident Resolved</p>
-      <p class="text-xs text-gray-500 mt-0.5">${icon} ${vd.vehicle_name || vehicleId} is on scene</p>
+      <p class="font-bold text-green-700 text-sm">Unit On Scene</p>
+      <p class="text-xs text-gray-500 mt-0.5">${icon} ${vd.vehicle_name || vehicleId} has arrived — resolving shortly</p>
     </div>`;
   setTimeout(() => {
     panel.classList.add("hidden");
@@ -2917,14 +2944,14 @@ async function loadIncidentsOverlay() {
     incidentOverlayMarkers = {};
 
     incidents
-      .filter(i => ["created", "dispatched", "in_progress"].includes(i.status))
+      .filter(i => ["created", "dispatched", "in_progress", "on_scene"].includes(i.status))
       .forEach(inc => {
         const lat = parseFloat(inc.latitude), lng = parseFloat(inc.longitude);
         if (isNaN(lat) || isNaN(lng)) return;
 
         addIncidentOverlayMarker(inc, lat, lng);
 
-        // Route the correct vehicle toward this incident
+        // Route the correct vehicle toward this incident (not yet on scene)
         if (inc.status === "dispatched" || inc.status === "in_progress") {
           const alreadyRouted = Object.values(dispatchRoutes).some(r => r.incidentId === inc._id && !r.arrived);
           if (!alreadyRouted) {
@@ -2966,7 +2993,7 @@ function addIncidentOverlayMarker(inc, lat, lng) {
     "Medical Emergency":"🏥","Fire Outbreak":"🔥","Robbery":"🔫",
     "Road Accident":"🚧","Crime":"👮","Explosion":"💥","Flood":"🌊","Other":"⚠️"
   }[inc.incident_type] || "🚨";
-  const statusColor = inc.status === "resolved" ? "#16a34a" : inc.status === "in_progress" ? "#d97706" : "#dc2626";
+  const statusColor = inc.status === "resolved" ? "#16a34a" : inc.status === "on_scene" ? "#16a34a" : inc.status === "in_progress" ? "#d97706" : "#dc2626";
   const responder = Array.isArray(inc.responder) ? inc.responder[0] : inc.responder;
 
   const marker = L.marker([lat, lng], { icon: buildIncidentBeaconIcon(inc), zIndexOffset: 1000 })
@@ -3090,12 +3117,17 @@ async function checkArrival(vehicleId, lat, lng) {
   // Mark arrived immediately to prevent double-trigger
   route.arrived = true;
 
-  // Update incident status → resolved on arrival
+  // Determine incident type for smart resolve delay
+  const _arrivalTypeLower = (route.incidentType || "").toLowerCase();
+  const _arrivalIsMedical = _arrivalTypeLower.includes("medical") || _arrivalTypeLower.includes("accident") || _arrivalTypeLower.includes("injury");
+  const _arrivalResolveDelay = _arrivalIsMedical ? 12000 : (_arrivalTypeLower.includes("crime") || _arrivalTypeLower.includes("rob") ? 3000 : 5000);
+
+  // Update incident status → on_scene (vehicle has arrived)
   try {
     await fetch(`${API.incident}/incidents/${route.incidentId}/status`, {
       method: "PUT",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ status: "resolved" }),
+      body: JSON.stringify({ status: "on_scene" }),
     });
   } catch {}
 
@@ -3109,24 +3141,35 @@ async function checkArrival(vehicleId, lat, lng) {
     vehicleData[vehicleId] = { ...(vehicleData[vehicleId] || {}), status: "on_scene" };
   } catch {}
 
-  // Remove route lines
-  if (routeLines[vehicleId])     { routeLines[vehicleId].remove();     delete routeLines[vehicleId]; }
-  if (routeBackLines[vehicleId]) { routeBackLines[vehicleId].remove();  delete routeBackLines[vehicleId]; }
-
-  // Update incident marker to resolved beacon
+  // Update incident marker to on_scene beacon
   const m = incidentOverlayMarkers[route.incidentId];
   if (m) {
-    m.setIcon(buildIncidentBeaconIcon({ incident_type: route.incidentType, status: "resolved" }));
+    m.setIcon(buildIncidentBeaconIcon({ incident_type: route.incidentType, status: "on_scene" }));
   }
 
-  // Restore vehicle highlight state (dims cleared, all normal)
+  // Restore vehicle highlight state now
   clearVehicleHighlight(vehicleId);
 
   // Arrival toast-banner
   showArrivalBanner(vehicleId, route.incidentType);
 
-  // Refresh incidents list if visible
+  // Refresh incidents list
   loadIncidents();
+
+  // → resolved: after type-dependent delay
+  setTimeout(async () => {
+    try {
+      await fetch(`${API.incident}/incidents/${route.incidentId}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ status: "resolved" }),
+      });
+      // Update map marker to resolved
+      const mm = incidentOverlayMarkers[route.incidentId];
+      if (mm) mm.setIcon(buildIncidentBeaconIcon({ incident_type: route.incidentType, status: "resolved" }));
+      loadIncidents();
+    } catch {}
+  }, _arrivalResolveDelay);
 }
 
 function showArrivalBanner(vehicleId, incidentType) {

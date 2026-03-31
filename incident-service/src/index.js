@@ -359,7 +359,7 @@ app.get("/incidents/:id", authenticate, async (req, res) => {
 // ── PUT /incidents/:id/status ─────────────────────────────
 app.put("/incidents/:id/status", authenticate, async (req, res) => {
   const { status } = req.body;
-  const validStatuses = ["created", "dispatched", "in_progress", "resolved"];
+  const validStatuses = ["created", "dispatched", "in_progress", "on_scene", "resolved"];
   if (!validStatuses.includes(status))
     return res.status(400).json({ error: "Invalid status" });
 

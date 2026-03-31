@@ -92,6 +92,15 @@ app.post("/vehicles/register", authenticate, async (req, res) => {
 
   try {
     const db = getDB();
+
+    // Determine coordinates: use provided values; if missing/zero, infer from name
+    let lat = parseFloat(latitude) || 0;
+    let lng = parseFloat(longitude) || 0;
+    if (!lat && !lng) {
+      const inferred = extractLocationFromName(vehicle_name);
+      if (inferred) { lat = inferred.lat; lng = inferred.lng; }
+    }
+
     await db.collection("vehicle_locations").updateOne(
       { vehicle_id },
       {
@@ -99,8 +108,10 @@ app.post("/vehicles/register", authenticate, async (req, res) => {
           vehicle_id,
           vehicle_name,
           vehicle_type,
-          latitude: parseFloat(latitude) || 0,
-          longitude: parseFloat(longitude) || 0,
+          latitude:       lat,
+          longitude:      lng,
+          home_latitude:  lat,
+          home_longitude: lng,
           status: "idle",
           updated_at: new Date()
         }
@@ -148,9 +159,20 @@ app.patch("/vehicles/:id/status", async (req, res) => {
   if (!status) return res.status(400).json({ error: "status required" });
   try {
     const db = getDB();
+    const updates = { status, updated_at: new Date() };
+
+    // When resetting to idle, snap back to the vehicle's home (base) location
+    if (status === "idle") {
+      const existing = await db.collection("vehicle_locations").findOne({ vehicle_id: req.params.id });
+      if (existing && existing.home_latitude && existing.home_longitude) {
+        updates.latitude  = existing.home_latitude;
+        updates.longitude = existing.home_longitude;
+      }
+    }
+
     const vehicle = await db.collection("vehicle_locations").findOneAndUpdate(
       { vehicle_id: req.params.id },
-      { $set: { status, updated_at: new Date() } },
+      { $set: updates },
       { returnDocument: "after" }
     );
     if (!vehicle) return res.status(404).json({ error: "Vehicle not found" });
@@ -247,6 +269,89 @@ app.get("/vehicles/:id/history", authenticate, async (req, res) => {
   }
 });
 
+// ── Ghana place-name → coordinates lookup ─────────────────
+// Used to auto-set vehicle home location from its name.
+const GHANA_PLACES = [
+  // Greater Accra suburbs & towns
+  { name: "accra",          lat:  5.5560,  lng: -0.2010 },
+  { name: "tema",           lat:  5.6698,  lng: -0.0166 },
+  { name: "madina",         lat:  5.6800,  lng: -0.1700 },
+  { name: "teshie",         lat:  5.5900,  lng: -0.1000 },
+  { name: "nungua",         lat:  5.5800,  lng: -0.0700 },
+  { name: "lashibi",        lat:  5.6100,  lng: -0.0400 },
+  { name: "spintex",        lat:  5.6300,  lng: -0.1100 },
+  { name: "east legon",     lat:  5.6467,  lng: -0.1580 },
+  { name: "legon",          lat:  5.6467,  lng: -0.1867 },
+  { name: "adenta",         lat:  5.7100,  lng: -0.1700 },
+  { name: "ashiaman",       lat:  5.6991,  lng:  0.0333 },
+  { name: "kasoa",          lat:  5.5333,  lng: -0.4167 },
+  { name: "dome",           lat:  5.6500,  lng: -0.2400 },
+  { name: "weija",          lat:  5.5500,  lng: -0.3100 },
+  { name: "dansoman",       lat:  5.5200,  lng: -0.2500 },
+  { name: "la",             lat:  5.5650,  lng: -0.1600 },
+  { name: "osu",            lat:  5.5556,  lng: -0.1828 },
+  { name: "cantonments",    lat:  5.5700,  lng: -0.1900 },
+  // Ashanti
+  { name: "kumasi",         lat:  6.6885,  lng: -1.6244 },
+  { name: "asokwa",         lat:  6.6750,  lng: -1.6100 },
+  { name: "bantama",        lat:  6.7050,  lng: -1.6400 },
+  { name: "oforikrom",      lat:  6.6600,  lng: -1.5900 },
+  { name: "suame",          lat:  6.7200,  lng: -1.6300 },
+  { name: "aboabo",         lat:  6.6950,  lng: -1.6050 },
+  // Western
+  { name: "takoradi",       lat:  4.9016,  lng: -1.7442 },
+  { name: "sekondi",        lat:  4.9405,  lng: -1.7068 },
+  // Central
+  { name: "cape coast",     lat:  5.1053,  lng: -1.2466 },
+  // Eastern
+  { name: "koforidua",      lat:  6.0940,  lng: -0.2570 },
+  // Volta
+  { name: "ho",             lat:  6.6012,  lng:  0.4700 },
+  { name: "keta",           lat:  5.9200,  lng:  1.0050 },
+  { name: "hohoe",          lat:  7.1530,  lng:  0.4750 },
+  // Oti
+  { name: "dambai",         lat:  8.0730,  lng:  0.1780 },
+  // Bono
+  { name: "sunyani",        lat:  7.3349,  lng: -2.3266 },
+  // Bono East
+  { name: "techiman",       lat:  7.5905,  lng: -1.9380 },
+  // Ahafo
+  { name: "goaso",          lat:  6.8060,  lng: -2.5160 },
+  // Northern
+  { name: "tamale",         lat:  9.4034,  lng: -0.8424 },
+  { name: "yendi",          lat:  9.4426,  lng: -0.0099 },
+  // Savannah
+  { name: "damongo",        lat:  9.0840,  lng: -1.8220 },
+  // North East
+  { name: "nalerigu",       lat: 10.5200,  lng: -0.3640 },
+  { name: "gambaga",        lat: 10.5240,  lng: -0.3561 },
+  // Upper East
+  { name: "bolgatanga",     lat: 10.7854,  lng: -0.8514 },
+  // Upper West
+  { name: "wa",             lat: 10.0601,  lng: -2.5099 },
+  // Western North
+  { name: "sefwi wiawso",   lat:  6.2080,  lng: -2.4860 },
+  { name: "sefwi",          lat:  6.2080,  lng: -2.4860 },
+];
+
+/**
+ * Scan a vehicle name for a known Ghana place keyword.
+ * Returns { lat, lng } if found, or null.
+ */
+function extractLocationFromName(vehicleName) {
+  if (!vehicleName) return null;
+  const lower = vehicleName.toLowerCase();
+  // Sort by descending name length so multi-word places ("sefwi wiawso", "east legon")
+  // match before shorter prefixes
+  const sorted = [...GHANA_PLACES].sort((a, b) => b.name.length - a.name.length);
+  for (const place of sorted) {
+    if (lower.includes(place.name)) {
+      return { lat: place.lat, lng: place.lng };
+    }
+  }
+  return null;
+}
+
 // ── Ghana-wide vehicle seed data ─────────────────────────
 // One vehicle per responder station — same coordinates so
 // nearest-vehicle dispatch resolves to the correct region.
@@ -332,7 +437,13 @@ async function seedVehiclesIfEmpty() {
     const count = await db.collection("vehicle_locations").countDocuments();
     if (count === 0) {
       await db.collection("vehicle_locations").insertMany(
-        SEED_VEHICLES.map(v => ({ ...v, status: "idle", updated_at: new Date() }))
+        SEED_VEHICLES.map(v => ({
+          ...v,
+          home_latitude:  v.latitude,
+          home_longitude: v.longitude,
+          status:     "idle",
+          updated_at: new Date()
+        }))
       );
       console.log(`Seeded ${SEED_VEHICLES.length} vehicles across all 16 Ghana regions`);
     }
