@@ -1591,7 +1591,7 @@ async function submitIncident() {
     if (vLat != null && vLng != null) {
       const dist = haversineKm(parseFloat(vLat), parseFloat(vLng), data.latitude, data.longitude);
       // 3000 ms/km: 5 km ≈ 15 s, 8 km ≈ 24 s, 40 km (Kasoa) ≈ 2 min, 100 km ≈ 5 min
-      travelMs = Math.max(10000, Math.min(900000, dist * 3000));
+      travelMs = Math.max(5000, Math.min(45000, dist * 500));
     }
     const etaSec = Math.round(travelMs / 1000);
     const etaStr = etaSec >= 60 ? `${Math.ceil(etaSec/60)} min` : `${etaSec} sec`;
@@ -2438,7 +2438,7 @@ function focusDispatch(vehicleId) {
 let incidentOverlayMarkers = {};  // incidentId → L.Marker
 let dispatchRoutes = {};          // vehicleId  → { incidentId, targetLat, targetLng, arrived }
 let routeLines     = {};          // vehicleId  → L.Polyline
-const ARRIVAL_KM   = 1.0;        // 1 km = "arrived"
+const ARRIVAL_KM   = 0.02;       // 20 m — vehicle must reach the incident pin
 
 // Haversine great-circle distance in km
 function haversineKm(lat1, lng1, lat2, lng2) {
@@ -2966,7 +2966,7 @@ async function loadIncidentsOverlay() {
               const pos = vehiclePositions[vid] || { lat, lng };
               const dist = haversineKm(pos.lat, pos.lng, lat, lng);
               // Display travel time capped at 30 s so movement is clearly visible on map
-              const travelMs = Math.max(8000, Math.min(30000, dist * 300));
+              const travelMs = Math.max(5000, Math.min(45000, dist * 500));
               dispatchRoutes[vid] = {
                 incidentId: inc._id, targetLat: lat, targetLng: lng,
                 startLat: pos.lat, startLng: pos.lng,
@@ -3037,7 +3037,7 @@ function assignNearestVehicle(inc, incLat, incLng) {
 
   const startPos = vehiclePositions[bestId] || { lat: incLat, lng: incLng };
   // Travel time: 1500 ms per km — nearby fast, cross-country up to 10 min
-  const travelMs = Math.max(8000, Math.min(30000, bestDist * 300));
+  const travelMs = Math.max(5000, Math.min(45000, bestDist * 500));
 
   dispatchRoutes[bestId] = {
     incidentId:   inc._id,
