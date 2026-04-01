@@ -1700,13 +1700,16 @@ async function submitIncident() {
         } else if (trackingMap) {
           trackingMap.invalidateSize();
           redrawActiveRouteLines();
-          // Pan to show vehicle→incident
+          // Pan to show vehicle → incident
           const pos = vehiclePositions[vid];
           if (pos) {
             const bounds = L.latLngBounds([[pos.lat, pos.lng], [incLat, incLng]]);
             trackingMap.fitBounds(bounds.pad(0.25));
           }
-          loadIncidentsOverlay();
+          loadIncidentsOverlay().then(() => {
+            if (!autoSimRunning) startAutoSim();
+          });
+          // suppress original loadIncidentsOverlay below — handled in .then above
         }
       }, 1500);
     }
@@ -2448,14 +2451,17 @@ function redrawActiveRouteLines() {
 function initTrackingMap() {
   if (trackingMapInit) return;
   trackingMapInit = true;
-  // Start at Ghana-wide view so all vehicles are visible
   trackingMap = L.map("tracking-map").setView([7.9465, -1.0232], 7);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
     { attribution: "© OpenStreetMap contributors" }).addTo(trackingMap);
-  // Load all vehicles, then draw routes and fit map to show everyone
+  // Load vehicles first, THEN load incident routes, THEN start simulation
   loadVehicles().then(() => {
     redrawActiveRouteLines();
-    loadIncidentsOverlay();
+    return loadIncidentsOverlay();
+  }).then(() => {
+    // Start simulation automatically if any active dispatch routes were found
+    const hasActive = Object.keys(dispatchRoutes).some(v => !dispatchRoutes[v].arrived);
+    if (hasActive && !autoSimRunning) startAutoSim();
     _fitAllOrActiveRoutes();
   });
   setTimeout(() => trackingMap.invalidateSize(), 150);
@@ -2485,7 +2491,11 @@ function reinitTrackingMap() {
     setTimeout(() => trackingMap.invalidateSize(), 150);
     loadVehicles().then(() => {
       redrawActiveRouteLines();
-      loadIncidentsOverlay();
+      return loadIncidentsOverlay();
+    }).then(() => {
+      const hasActive = Object.keys(dispatchRoutes).some(v => !dispatchRoutes[v].arrived);
+      if (hasActive && !autoSimRunning) startAutoSim();
+      _fitAllOrActiveRoutes();
     });
   }
 }
@@ -3052,25 +3062,22 @@ function drawRouteLine(vehicleId) {
   if (routeBackLines[vehicleId]){ routeBackLines[vehicleId].remove(); delete routeBackLines[vehicleId]; }
 
   const coords = [[pos.lat, pos.lng], [route.targetLat, route.targetLng]];
-  const isActive = vehicleId === activeDispatchVehicle;
+  // Use vehicle-type colour so the line is always meaningful
+  const vType  = vehicleData[vehicleId]?.vehicle_type || "ambulance";
+  const lineColor = { police: "#3b82f6", fire: "#ef4444", ambulance: "#10b981" }[vType] || "#ef4444";
 
-  if (isActive) {
-    // Background glow track (thick, translucent)
-    routeBackLines[vehicleId] = L.polyline(coords, {
-      color: "#ef4444", weight: 14, opacity: 0.13, lineCap: "round"
-    }).addTo(trackingMap);
-    // Bright animated dash line on top
-    routeLines[vehicleId] = L.polyline(coords, {
-      color: "#ef4444", weight: 5, opacity: 0.95, dashArray: "14 7",
-      dashOffset: "0", lineCap: "round"
-    }).addTo(trackingMap);
-    // Start/restart dash animation
-    startRouteLineAnimation(vehicleId);
-  } else {
-    routeLines[vehicleId] = L.polyline(coords, {
-      color: "#dc2626", weight: 2, opacity: 0.5, dashArray: "8 5"
-    }).addTo(trackingMap);
-  }
+  // Background glow track (always drawn — thick, translucent)
+  routeBackLines[vehicleId] = L.polyline(coords, {
+    color: lineColor, weight: 16, opacity: 0.15, lineCap: "round"
+  }).addTo(trackingMap);
+
+  // Bright animated dash line on top
+  routeLines[vehicleId] = L.polyline(coords, {
+    color: lineColor, weight: 6, opacity: 0.95, dashArray: "16 8",
+    dashOffset: "0", lineCap: "round"
+  }).addTo(trackingMap);
+
+  startRouteLineAnimation(vehicleId);
 }
 
 function updateRouteLine(vehicleId, curLat, curLng) {
