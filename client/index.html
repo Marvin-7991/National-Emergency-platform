@@ -1283,6 +1283,11 @@ async function register() {
 
 // ── Tabs ───────────────────────────────────────────────────
 function showTab(tabId, btn) {
+  // Stop hospital polling when leaving manage tab
+  if (tabId !== "manage-tab") {
+    clearInterval(_hospitalPollInterval);
+    _hospitalPollInterval = null;
+  }
   document.querySelectorAll(".tab-content").forEach(el => {
     el.classList.remove("active");
     el.style.display = "none";
@@ -1597,6 +1602,9 @@ async function submitIncident() {
 
     sucText.innerHTML = `<strong>Incident created!</strong> ${displayName ? `Dispatching <strong>${displayName}</strong> — ETA ~${etaStr}` : '<i class="fa-solid fa-triangle-exclamation"></i> No available responder found nearby.'}`;
     sucEl.classList.remove("hidden");
+
+    // Refresh hospital capacity immediately after incident is assigned
+    loadHospitals();
 
     // Show dispatch info panel
     if (displayName && data.assigned_vehicle_id) {
@@ -1928,9 +1936,16 @@ async function deleteIncident(id, incidentType) {
 //   MANAGE TAB
 // ══════════════════════════════════════════════════════════
 
+let _hospitalPollInterval = null;
+
 function loadManageTab() {
   if (!user) return;
-  if (["hospital_admin","system_admin"].includes(user.role)) loadHospitals();
+  if (["hospital_admin","system_admin"].includes(user.role)) {
+    loadHospitals();
+    // Auto-refresh hospital capacity every 15 seconds while on manage tab
+    clearInterval(_hospitalPollInterval);
+    _hospitalPollInterval = setInterval(loadHospitals, 15000);
+  }
   if (["police_admin","fire_admin","system_admin"].includes(user.role)) loadResponders();
   if (user.role === "ambulance_driver") {
     const saved = localStorage.getItem("vehicleId");
@@ -1959,25 +1974,23 @@ async function loadHospitals() {
       const pct = healthPercent(h);
       const healthColor = pct >= 50 ? 'green' : pct >= 25 ? 'yellow' : 'red';
       return `
-      <div class="bg-gradient-to-br from-white to-gray-50 border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition"
+      <div class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition"
         data-hospital-id="${h._id}" data-available="${h.available_beds}">
-        <div class="flex items-start justify-between mb-3">
+        <div class="flex items-center gap-2 mb-2">
+          <i class="fa-solid fa-hospital text-red-500 text-lg"></i>
+          <h4 class="font-bold text-gray-800 text-sm leading-tight">${h.name}</h4>
+        </div>
+        <div class="flex items-end justify-between mb-2">
           <div>
-            <h4 class="font-bold text-gray-800"><i class="fa-solid fa-hospital"></i> ${h.name}</h4>
-            <p class="text-xs text-gray-500 mt-0.5"><i class="fa-solid fa-location-dot"></i> ${h.latitude?.toFixed(4)}, ${h.longitude?.toFixed(4)}</p>
+            <span class="text-3xl font-extrabold text-${healthColor}-600">${h.available_beds}</span>
+            <span class="text-lg font-semibold text-gray-400"> / ${h.capacity}</span>
+            <p class="text-xs text-gray-500 mt-0.5">beds available</p>
           </div>
-          <span class="text-2xl font-bold text-${healthColor}-600">${h.available_beds}/${h.capacity}</span>
+          <span class="text-2xl font-bold text-${healthColor}-500">${pct}%</span>
         </div>
-        <div class="mb-3">
-          <div class="flex justify-between items-center text-xs text-gray-600 mb-1">
-            <span>Available Capacity</span>
-            <span class="font-semibold">${pct}%</span>
-          </div>
-          <div class="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
-            <div class="bg-${healthColor}-500 h-full transition-all" style="width: ${pct}%"></div>
-          </div>
+        <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+          <div class="bg-${healthColor}-500 h-full rounded-full transition-all" style="width: ${pct}%"></div>
         </div>
-        <p class="text-xs text-gray-400 italic">Capacity is fixed. Available beds update automatically when incidents are assigned or resolved.</p>
       </div>
     `; }).join("");
   } catch (err) {
