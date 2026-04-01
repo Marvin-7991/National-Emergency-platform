@@ -375,18 +375,14 @@ app.put("/incidents/:id/status", authenticate, async (req, res) => {
       { $set: { status, updated_at: new Date() } }
     );
 
-    // Free up responder, hospital bed, and vehicle when resolved
+    // Free up responder and vehicle when resolved.
+    // Hospital bed is NOT restored on resolve — the patient is admitted and occupying the bed.
+    // Capacity is only restored when the incident is deleted/cancelled.
     if (status === "resolved") {
       if (incident.assigned_unit) {
         await db.collection("responders").updateOne(
           { _id: incident.assigned_unit },
           { $set: { is_available: true } }
-        );
-      }
-      if (incident.hospital_id) {
-        await db.collection("hospitals").updateOne(
-          { _id: incident.hospital_id },
-          { $inc: { available_beds: 1 } }
         );
       }
       // Reset dispatched vehicle back to idle so it can be reassigned
@@ -802,10 +798,41 @@ async function migrateResponderNames() {
   }
 }
 
+// Sets fixed capacity ceilings for the four registered hospitals and resets available_beds
+// to full so the display starts at e.g. "500/500". Runs on every startup — idempotent.
+async function migrateHospitalCapacities() {
+  try {
+    const db = getDB();
+    const fixedCapacities = [
+      { pattern: /korle.bu/i,    capacity: 800 },
+      { pattern: /achimota/i,    capacity: 400 },
+      { pattern: /37.military/i, capacity: 500 },
+      { pattern: /taifa/i,       capacity: 200 },
+    ];
+    for (const { pattern, capacity } of fixedCapacities) {
+      const hospital = await db.collection("hospitals").findOne({ name: { $regex: pattern } });
+      if (hospital) {
+        const needsUpdate = hospital.capacity !== capacity || hospital.available_beds !== capacity;
+        if (needsUpdate) {
+          await db.collection("hospitals").updateOne(
+            { _id: hospital._id },
+            { $set: { capacity, available_beds: capacity } }
+          );
+          console.log(`Set ${hospital.name} capacity to ${capacity}/${capacity}`);
+        }
+      }
+    }
+    console.log("Hospital capacity migration complete");
+  } catch (err) {
+    console.error("Hospital capacity migration error:", err.message);
+  }
+}
+
 const PORT = process.env.PORT || 3002;
 
 app.listen(PORT, () => console.log(`Incident service running on port ${PORT}`));
 Promise.all([initDB(), connect()])
   .then(seedIfEmpty)
   .then(migrateResponderNames)
+  .then(migrateHospitalCapacities)
   .catch(err => console.error("Failed to initialize:", err));
