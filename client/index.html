@@ -239,7 +239,7 @@
       <div class="px-6 pt-5 pb-2">
         <div class="loc-search-wrap">
           <div class="flex gap-2">
-            <input id="picker-search" type="text" placeholder="Search a location in Ghana (e.g., Osu, Korle-Bu Hospital)..."
+            <input id="picker-search" type="text" placeholder="Search any location — neighbourhood, street or landmark (e.g. Burkina, Taifa or Adenta Housing)..."
               class="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition"
               oninput="debouncedPickerSearch(this.value)"
               onkeydown="if(event.key==='Escape') document.getElementById('picker-results').classList.add('hidden')"/>
@@ -464,7 +464,7 @@
             <!-- Search bar floating over map -->
             <div class="absolute top-3 left-3 right-3 z-[1000] loc-search-wrap">
               <div class="flex gap-2">
-                <input id="inc-search" type="text" placeholder="🔍 Search for a location in Ghana..."
+                <input id="inc-search" type="text" placeholder="🔍 Search any area — neighbourhood, village or landmark (e.g. Burkina, Taifa)..."
                   class="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 bg-white shadow-md"
                   oninput="debouncedIncSearch(this.value)"
                   onkeydown="if(event.key==='Escape') document.getElementById('inc-search-results').classList.add('hidden')"/>
@@ -1354,6 +1354,11 @@ function placeIncidentPin(lat, lng, label) {
   }
 }
 
+// Safely escape a string for use in an HTML attribute value
+function escapeAttr(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
 // Incident search
 let incSearchTimer;
 function debouncedIncSearch(q) {
@@ -1366,15 +1371,19 @@ function debouncedIncSearch(q) {
 async function runIncidentSearch(q) {
   try {
     const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q + ", Ghana")}&format=json&limit=5`
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&countrycodes=gh&format=json&limit=10&addressdetails=1`
     );
     const results = await res.json();
     const el = document.getElementById("inc-search-results");
-    if (!results.length) { el.classList.add("hidden"); return; }
-    el.innerHTML = results.map(r => `
-      <div class="loc-result-item"
-        onclick="selectIncidentSearchResult(${r.lat}, ${r.lon}, this.innerText)">${r.display_name}</div>
-    `).join("");
+    if (!results.length) {
+      el.innerHTML = `<div class="px-3 py-2 text-xs text-gray-500 italic">No results found. Try a more specific name, e.g. "Burkina, Taifa" or "Adenta Housing, Accra".</div>`;
+      el.classList.remove("hidden");
+      return;
+    }
+    el.innerHTML = results.map(r => {
+      const typeLabel = (r.type && r.type !== "administrative") ? `<span class="ml-1.5 text-[10px] font-semibold text-blue-500 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded capitalize">${r.type}</span>` : "";
+      return `<div class="loc-result-item" onclick="selectIncidentSearchResult(${r.lat}, ${r.lon}, this.dataset.label)" data-label="${escapeAttr(r.display_name)}">${r.display_name}${typeLabel}</div>`;
+    }).join("");
     el.classList.remove("hidden");
   } catch {}
 }
@@ -1516,15 +1525,19 @@ function debouncedPickerSearch(q) {
 async function runPickerSearch(q) {
   try {
     const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q + ", Ghana")}&format=json&limit=5`
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&countrycodes=gh&format=json&limit=10&addressdetails=1`
     );
     const results = await res.json();
     const el = document.getElementById("picker-results");
-    if (!results.length) { el.classList.add("hidden"); return; }
-    el.innerHTML = results.map(r => `
-      <div class="loc-result-item"
-        onclick="selectPickerResult(${r.lat}, ${r.lon})">${r.display_name}</div>
-    `).join("");
+    if (!results.length) {
+      el.innerHTML = `<div class="px-3 py-2 text-xs text-gray-500 italic">No results found. Try a more specific name, e.g. "Burkina, Taifa" or "Adenta Housing, Accra".</div>`;
+      el.classList.remove("hidden");
+      return;
+    }
+    el.innerHTML = results.map(r => {
+      const typeLabel = (r.type && r.type !== "administrative") ? `<span class="ml-1.5 text-[10px] font-semibold text-blue-500 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded capitalize">${r.type}</span>` : "";
+      return `<div class="loc-result-item" onclick="selectPickerResult(${r.lat}, ${r.lon})" data-label="${escapeAttr(r.display_name)}">${r.display_name}${typeLabel}</div>`;
+    }).join("");
     el.classList.remove("hidden");
   } catch {}
 }
