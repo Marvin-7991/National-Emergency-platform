@@ -1985,7 +1985,7 @@ async function loadHospitals() {
       el.innerHTML = `<p class="text-gray-400 text-sm col-span-full text-center py-8">No hospitals registered yet. Add one to get started.</p>`;
       return;
     }
-    const healthPercent = (h) => Math.round((h.available_beds / (h.capacity || 1)) * 100);
+    const healthPercent = (h) => Math.floor((h.available_beds / (h.capacity || 1)) * 100);
     el.innerHTML = data.map(h => {
       const pct = healthPercent(h);
       const healthColor = pct >= 50 ? 'green' : pct >= 25 ? 'yellow' : 'red';
