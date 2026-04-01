@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
@@ -3531,133 +3532,341 @@ async function saveProfilePassword() {
   }
 }
 
+// Track Chart.js instances so we can destroy them on reload
+const _analyticsCharts = {};
+
 async function loadAnalytics() {
   const el = document.getElementById("analytics-content");
   try {
     const [rtRes, regionRes, resourceRes] = await Promise.all([
-      fetch(`${API.analytics}/analytics/response-times`,     { headers: { Authorization: `Bearer ${token}` } }),
-      fetch(`${API.analytics}/analytics/incidents-by-region`,{ headers: { Authorization: `Bearer ${token}` } }),
-      fetch(`${API.analytics}/analytics/resource-utilization`,{headers: { Authorization: `Bearer ${token}` } }),
+      fetch(`${API.analytics}/analytics/response-times`,      { headers: { Authorization: `Bearer ${token}` } }),
+      fetch(`${API.analytics}/analytics/incidents-by-region`, { headers: { Authorization: `Bearer ${token}` } }),
+      fetch(`${API.analytics}/analytics/resource-utilization`,{ headers: { Authorization: `Bearer ${token}` } }),
     ]);
     const rt       = await rtRes.json();
     const region   = await regionRes.json();
     const resource = await resourceRes.json();
 
+    // Destroy old charts before replacing DOM
+    Object.values(_analyticsCharts).forEach(c => c.destroy());
+    Object.keys(_analyticsCharts).forEach(k => delete _analyticsCharts[k]);
+
+    const avgResp = rt.average_response_minutes && rt.average_response_minutes !== "N/A"
+      ? Math.round(parseFloat(rt.average_response_minutes)) : null;
+    const utilPct  = Math.round(parseFloat(resource.utilization_pct) || 0);
+    const idlePct  = 100 - utilPct;
+
+    const typeLabels  = Object.keys(region.by_type  || {});
+    const typeCounts  = Object.values(region.by_type || {});
+    const statusLabels = Object.keys(region.by_status  || {});
+    const statusCounts = Object.values(region.by_status || {});
+
+    const respTypes     = Object.keys(resource.by_type || {});
+    const respAvailable = respTypes.map(t => resource.by_type[t].available);
+    const respDeployed  = respTypes.map(t => resource.by_type[t].total - resource.by_type[t].available);
+
+    const typeColors = [
+      "#ef4444","#f97316","#eab308","#22c55e","#3b82f6","#8b5cf6","#ec4899"
+    ];
+    const statusColorMap = {
+      created:"#fcd34d", dispatched:"#60a5fa", in_progress:"#fb923c", resolved:"#9ca3af", on_scene:"#4ade80"
+    };
+    const statusColors = statusLabels.map(s => statusColorMap[s] || "#d1d5db");
+
     el.innerHTML = `
-      <!-- Key Metrics -->
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <div class="card text-center animate-slideIn" style="animation-delay: 0s">
-          <p class="text-4xl font-bold text-red-600">${region.total || 0}</p>
-          <p class="text-gray-600 text-sm mt-2">Total Incidents</p>
+      <!-- KPI Cards -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div class="card text-center animate-slideIn" style="animation-delay:0s">
+          <div class="flex justify-center mb-2">
+            <span class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+              <i class="fa-solid fa-triangle-exclamation text-red-600"></i>
+            </span>
+          </div>
+          <p class="text-4xl font-extrabold text-red-600">${region.total || 0}</p>
+          <p class="text-gray-500 text-xs mt-1 uppercase tracking-wide">Total Incidents</p>
         </div>
-        <div class="card text-center animate-slideIn" style="animation-delay: 0.1s">
-          <p class="text-4xl font-bold text-blue-600">${rt.average_response_minutes && rt.average_response_minutes !== 'N/A' 
-            ? Math.round(parseFloat(rt.average_response_minutes)) 
-            : '—'}</p>
-          <p class="text-gray-600 text-sm mt-2">Avg Response Time (min)</p>
+        <div class="card text-center animate-slideIn" style="animation-delay:0.1s">
+          <div class="flex justify-center mb-2">
+            <span class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+              <i class="fa-solid fa-clock text-blue-600"></i>
+            </span>
+          </div>
+          <p class="text-4xl font-extrabold text-blue-600">${avgResp !== null ? avgResp : "—"}</p>
+          <p class="text-gray-500 text-xs mt-1 uppercase tracking-wide">Avg Response (min)</p>
         </div>
-        <div class="card text-center animate-slideIn" style="animation-delay: 0.2s">
-          <p class="text-4xl font-bold text-green-600">${Math.round(resource.utilization_pct || 0)}%</p>
-          <p class="text-gray-600 text-sm mt-2">Resource Utilization</p>
+        <div class="card text-center animate-slideIn" style="animation-delay:0.2s">
+          <div class="flex justify-center mb-2">
+            <span class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+              <i class="fa-solid fa-gauge-high text-green-600"></i>
+            </span>
+          </div>
+          <p class="text-4xl font-extrabold text-green-600">${utilPct}%</p>
+          <p class="text-gray-500 text-xs mt-1 uppercase tracking-wide">Resource Utilization</p>
         </div>
-        <div class="card text-center animate-slideIn" style="animation-delay: 0.3s">
-          <p class="text-4xl font-bold text-purple-600">${resource.active_vehicles || 0}</p>
-          <p class="text-gray-600 text-sm mt-2">Active Vehicles</p>
+        <div class="card text-center animate-slideIn" style="animation-delay:0.3s">
+          <div class="flex justify-center mb-2">
+            <span class="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
+              <i class="fa-solid fa-truck-medical text-purple-600"></i>
+            </span>
+          </div>
+          <p class="text-4xl font-extrabold text-purple-600">${resource.active_vehicles || 0}</p>
+          <p class="text-gray-500 text-xs mt-1 uppercase tracking-wide">Active Vehicles</p>
         </div>
       </div>
 
-      <!-- Detailed Analytics -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        <!-- Incidents by Type -->
+      <!-- Charts Row 1 -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <!-- Incidents by Type bar chart -->
         <div class="card">
-          <h3 class="font-bold text-gray-800 mb-4 text-lg"><i class="fa-solid fa-chart-bar"></i> Incidents by Type</h3>
-          ${Object.entries(region.by_type || {}).length
-            ? Object.entries(region.by_type).map(([type, count]) => `
-              <div class="flex justify-between items-center py-2.5 border-b border-gray-100 last:border-0">
-                <span class="text-gray-700">${type}</span>
-                <span class="inline-block bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-bold">${count}</span>
-              </div>`).join("")
-            : "<p class='text-gray-400 text-sm py-4'>No incidents recorded yet</p>"}
-        </div>
-
-        <!-- Incidents by Status -->
-        <div class="card">
-          <h3 class="font-bold text-gray-800 mb-4 text-lg"><i class="fa-solid fa-chart-line"></i> Incidents by Status</h3>
-          ${Object.entries(region.by_status || {}).length
-            ? Object.entries(region.by_status).map(([status, count]) => {
-              const statusColors = {
-                created: 'yellow',
-                dispatched: 'blue',
-                in_progress: 'green',
-                resolved: 'gray'
-              };
-              const color = statusColors[status] || 'gray';
-              return `
-              <div class="flex justify-between items-center py-2.5 border-b border-gray-100 last:border-0">
-                <span class="status-badge status-${status}">${status.replace(/_/g, ' ')}</span>
-                <span class="font-bold text-gray-800">${count}</span>
-              </div>`;
-            }).join("")
-            : "<p class='text-gray-400 text-sm py-4'>No data available</p>"}
-        </div>
-
-        <!-- Responder Status -->
-        <div class="card">
-          <h3 class="font-bold text-gray-800 mb-4 text-lg"><i class="fa-solid fa-truck-medical"></i> Responder Status</h3>
-          ${Object.entries(resource.by_type || {}).length
-            ? Object.entries(resource.by_type).map(([type, d]) => `
-              <div class="py-3 border-b border-gray-100 last:border-0">
-                <div class="flex justify-between items-center mb-2">
-                  <span class="font-semibold text-gray-700 capitalize">${type}</span>
-                  <span class="text-sm">
-                    <span class="text-green-600 font-bold">${d.available}</span>
-                    <span class="text-gray-400">/ ${d.total}</span>
-                  </span>
-                </div>
-                <div class="w-full bg-gray-200 rounded-full h-2.5">
-                  <div class="bg-green-500 h-2.5 rounded-full transition-all" 
-                    style="width: ${Math.round((d.available / d.total) * 100)}%"></div>
-                </div>
-              </div>`).join("")
-            : "<p class='text-gray-400 text-sm py-4'>No responders configured</p>"}
-        </div>
-
-        <!-- Deployment Rate -->
-        <div class="card">
-          <h3 class="font-bold text-gray-800 mb-4 text-lg"><i class="fa-solid fa-location-dot"></i> Deployment Rate</h3>
-          <div class="text-center py-4">
-            <div class="text-5xl font-bold text-red-600 mb-2">${Math.round(resource.utilization_pct || 0)}%</div>
-            <p class="text-gray-600 text-sm mb-4">of available units deployed</p>
-            <div class="flex justify-between text-xs text-gray-600 mb-2">
-              <span>Idle</span><span>${Math.round(100 - (resource.utilization_pct || 0))}%</span>
-            </div>
-            <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-              <div class="bg-red-500 h-full transition-all" 
-                style="width: ${Math.round(resource.utilization_pct || 0)}%"></div>
-            </div>
+          <h3 class="font-bold text-gray-800 mb-4 text-base">
+            <i class="fa-solid fa-chart-bar text-blue-500 mr-2"></i>Incidents by Type
+          </h3>
+          <div style="position:relative;height:220px">
+            <canvas id="chart-type"></canvas>
           </div>
+        </div>
+
+        <!-- Incidents by Status doughnut -->
+        <div class="card">
+          <h3 class="font-bold text-gray-800 mb-4 text-base">
+            <i class="fa-solid fa-chart-pie text-orange-500 mr-2"></i>Incidents by Status
+          </h3>
+          <div style="position:relative;height:220px">
+            <canvas id="chart-status"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts Row 2 -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <!-- Responder availability grouped bar -->
+        <div class="card">
+          <h3 class="font-bold text-gray-800 mb-4 text-base">
+            <i class="fa-solid fa-users text-green-500 mr-2"></i>Responder Availability by Unit
+          </h3>
+          <div style="position:relative;height:220px">
+            <canvas id="chart-responders"></canvas>
+          </div>
+        </div>
+
+        <!-- Deployment rate doughnut gauge -->
+        <div class="card">
+          <h3 class="font-bold text-gray-800 mb-4 text-base">
+            <i class="fa-solid fa-location-dot text-red-500 mr-2"></i>Deployment Rate
+          </h3>
+          <div style="position:relative;height:180px">
+            <canvas id="chart-deployment"></canvas>
+          </div>
+          <div class="flex justify-center gap-6 mt-3 text-sm">
+            <span class="flex items-center gap-1.5">
+              <span class="w-3 h-3 rounded-full inline-block" style="background:#ef4444"></span>
+              <span class="text-gray-600">Deployed <strong>${utilPct}%</strong></span>
+            </span>
+            <span class="flex items-center gap-1.5">
+              <span class="w-3 h-3 rounded-full inline-block" style="background:#e5e7eb"></span>
+              <span class="text-gray-600">Idle <strong>${idlePct}%</strong></span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Vehicles overview bar -->
+      <div class="card mb-6">
+        <h3 class="font-bold text-gray-800 mb-4 text-base">
+          <i class="fa-solid fa-car text-purple-500 mr-2"></i>Vehicle Fleet Status
+        </h3>
+        <div style="position:relative;height:100px">
+          <canvas id="chart-vehicles"></canvas>
         </div>
       </div>
 
       <!-- System Status -->
       <div class="card bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200">
-        <h3 class="font-bold text-gray-800 mb-3"><i class="fa-solid fa-server"></i> System Status</h3>
+        <h3 class="font-bold text-gray-800 mb-3 text-base"><i class="fa-solid fa-server mr-2"></i>System Status</h3>
         <div class="grid grid-cols-3 gap-4 text-center">
           <div>
-            <p class="text-sm text-gray-600">WebSocket</p>
-            <p id="ws-status-text"class="text-lg font-bold text-green-600"><i class="fa-solid fa-circle-check"></i> Connected</p>
+            <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">WebSocket</p>
+            <p id="ws-status-text" class="text-sm font-bold text-green-600"><i class="fa-solid fa-circle-check mr-1"></i>Connected</p>
           </div>
           <div>
-            <p class="text-sm text-gray-600">Database</p>
-            <p class="text-lg font-bold text-green-600"><i class="fa-solid fa-circle-check"></i> Healthy</p>
+            <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Database</p>
+            <p class="text-sm font-bold text-green-600"><i class="fa-solid fa-circle-check mr-1"></i>Healthy</p>
           </div>
           <div>
-            <p class="text-sm text-gray-600">APIs</p>
-            <p class="text-lg font-bold text-green-600"><i class="fa-solid fa-circle-check"></i> Online</p>
+            <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">APIs</p>
+            <p class="text-sm font-bold text-green-600"><i class="fa-solid fa-circle-check mr-1"></i>Online</p>
           </div>
         </div>
       </div>
     `;
+
+    // ── Incidents by Type – horizontal bar ─────────────────────────────
+    if (typeLabels.length) {
+      _analyticsCharts.type = new Chart(document.getElementById("chart-type"), {
+        type: "bar",
+        data: {
+          labels: typeLabels,
+          datasets: [{
+            label: "Incidents",
+            data: typeCounts,
+            backgroundColor: typeLabels.map((_, i) => typeColors[i % typeColors.length] + "cc"),
+            borderColor:     typeLabels.map((_, i) => typeColors[i % typeColors.length]),
+            borderWidth: 1.5,
+            borderRadius: 6,
+          }]
+        },
+        options: {
+          indexAxis: "y",
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 }, grid: { color: "#f3f4f6" } },
+            y: { grid: { display: false } }
+          }
+        }
+      });
+    } else {
+      document.getElementById("chart-type").insertAdjacentHTML(
+        "afterend","<p class='text-gray-400 text-sm text-center mt-4'>No incidents recorded yet</p>"
+      );
+    }
+
+    // ── Incidents by Status – doughnut ─────────────────────────────────
+    if (statusLabels.length) {
+      _analyticsCharts.status = new Chart(document.getElementById("chart-status"), {
+        type: "doughnut",
+        data: {
+          labels: statusLabels.map(s => s.replace(/_/g," ")),
+          datasets: [{
+            data: statusCounts,
+            backgroundColor: statusColors,
+            borderWidth: 2,
+            borderColor: "#fff",
+            hoverOffset: 6
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          cutout: "62%",
+          plugins: {
+            legend: { position: "right", labels: { boxWidth: 12, padding: 10, font: { size: 12 } } }
+          }
+        }
+      });
+    } else {
+      document.getElementById("chart-status").insertAdjacentHTML(
+        "afterend","<p class='text-gray-400 text-sm text-center mt-4'>No status data</p>"
+      );
+    }
+
+    // ── Responder availability – grouped bar ───────────────────────────
+    if (respTypes.length) {
+      _analyticsCharts.responders = new Chart(document.getElementById("chart-responders"), {
+        type: "bar",
+        data: {
+          labels: respTypes.map(t => t.charAt(0).toUpperCase() + t.slice(1)),
+          datasets: [
+            {
+              label: "Available",
+              data: respAvailable,
+              backgroundColor: "#4ade80cc",
+              borderColor: "#22c55e",
+              borderWidth: 1.5,
+              borderRadius: 5,
+            },
+            {
+              label: "Deployed",
+              data: respDeployed,
+              backgroundColor: "#f87171cc",
+              borderColor: "#ef4444",
+              borderWidth: 1.5,
+              borderRadius: 5,
+            }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { position: "top", labels: { boxWidth: 12, font: { size: 12 } } }
+          },
+          scales: {
+            x: { grid: { display: false } },
+            y: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 }, grid: { color: "#f3f4f6" } }
+          }
+        }
+      });
+    } else {
+      document.getElementById("chart-responders").insertAdjacentHTML(
+        "afterend","<p class='text-gray-400 text-sm text-center mt-4'>No responders configured</p>"
+      );
+    }
+
+    // ── Deployment rate – half-doughnut gauge ──────────────────────────
+    _analyticsCharts.deployment = new Chart(document.getElementById("chart-deployment"), {
+      type: "doughnut",
+      data: {
+        labels: ["Deployed","Idle"],
+        datasets: [{
+          data: [utilPct, idlePct],
+          backgroundColor: ["#ef4444cc","#e5e7eb"],
+          borderWidth: 0,
+          hoverOffset: 4
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        circumference: 180, rotation: -90,
+        cutout: "70%",
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed}%` }
+          }
+        }
+      },
+      plugins: [{
+        id: "gaugeLabel",
+        afterDraw(chart) {
+          const { ctx, chartArea: { top, width } } = chart;
+          const centerX = width / 2 + chart.chartArea.left;
+          const centerY = top + chart.chartArea.height * 0.78;
+          ctx.save();
+          ctx.font = "bold 28px sans-serif";
+          ctx.fillStyle = "#ef4444";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(`${utilPct}%`, centerX, centerY);
+          ctx.font = "12px sans-serif";
+          ctx.fillStyle = "#6b7280";
+          ctx.fillText("deployed", centerX, centerY + 22);
+          ctx.restore();
+        }
+      }]
+    });
+
+    // ── Vehicle fleet – horizontal bar ─────────────────────────────────
+    const activeV = resource.active_vehicles || 0;
+    const idleV   = (resource.total_vehicles || 0) - activeV;
+    _analyticsCharts.vehicles = new Chart(document.getElementById("chart-vehicles"), {
+      type: "bar",
+      data: {
+        labels: ["Fleet"],
+        datasets: [
+          { label:`Active (${activeV})`,  data:[activeV], backgroundColor:"#a855f7cc", borderColor:"#9333ea", borderWidth:1.5, borderRadius:4 },
+          { label:`Idle (${idleV})`,      data:[idleV],   backgroundColor:"#e5e7eb",   borderColor:"#d1d5db", borderWidth:1.5, borderRadius:4 }
+        ]
+      },
+      options: {
+        indexAxis: "y",
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position:"right", labels:{ boxWidth:12, font:{ size:12 } } } },
+        scales: {
+          x: { stacked:true, beginAtZero:true, ticks:{ stepSize:1, precision:0 }, grid:{ color:"#f3f4f6" } },
+          y: { stacked:true, grid:{ display:false } }
+        }
+      }
+    });
+
   } catch (err) {
     el.innerHTML = `<div class="bg-red-50 border border-red-200 rounded-lg p-6 text-red-700">
       <p class="font-bold"><i class="fa-solid fa-triangle-exclamation"></i> Failed to load analytics</p>
