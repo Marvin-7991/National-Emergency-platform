@@ -2290,18 +2290,28 @@ function buildIncidentBeaconIcon(inc) {
 // ── Highlight the dispatched vehicle; keep all others fully visible ──
 function setVehicleHighlight(vehicleId) {
   activeDispatchVehicle = vehicleId;
-  // Only change the dispatched vehicle — others stay 'normal'
   if (trackingMarkers[vehicleId]) {
     trackingMarkers[vehicleId].setIcon(buildVehicleMarkerIcon(vehicleId, 'active'));
   }
-  // Animate route line dashes flowing toward incident
   startRouteLineAnimation(vehicleId);
-  // Start live dispatch panel countdown
   _updateDispatchPanel(vehicleId);
   if (dispatchPanelInterval) clearInterval(dispatchPanelInterval);
   dispatchPanelInterval = setInterval(() => {
     if (activeDispatchVehicle) _updateDispatchPanel(activeDispatchVehicle);
   }, 1000);
+
+  // Auto-zoom so vehicle movement is clearly visible (zoom 11-13 depending on distance)
+  const route = dispatchRoutes[vehicleId];
+  const pos   = vehiclePositions[vehicleId];
+  if (trackingMap && route && pos) {
+    const bounds = L.latLngBounds(
+      [pos.lat, pos.lng],
+      [route.targetLat, route.targetLng]
+    );
+    // Use a minimum zoom of 11 so even short-distance dispatches show movement
+    const zoom = Math.min(13, Math.max(11, trackingMap.getBoundsZoom(bounds.pad(0.35))));
+    trackingMap.setView(bounds.getCenter(), zoom, { animate: true, duration: 0.8 });
+  }
 }
 
 // ── Clear busy state — vehicle returns to normal/available ────────────
@@ -2524,18 +2534,19 @@ function animateMarkerTo(vehicleId, newLat, newLng) {
   const marker = trackingMarkers[vehicleId];
   if (!marker || !trackingMap) return;
 
-  const from = vehiclePositions[vehicleId] || { lat: newLat, lng: newLng };
-  // Skip if already there
-  if (Math.abs(from.lat - newLat) < 0.00001 && Math.abs(from.lng - newLng) < 0.00001) return;
+  // Always read the marker's CURRENT rendered position so interrupted
+  // animations don't reset the vehicle back to the stale stored position
+  const cur = marker.getLatLng();
+  const fromLat = cur.lat, fromLng = cur.lng;
+
+  if (Math.abs(fromLat - newLat) < 0.000005 && Math.abs(fromLng - newLng) < 0.000005) return;
 
   if (vehicleAnims[vehicleId]) clearInterval(vehicleAnims[vehicleId]);
 
   const startTime = Date.now();
-  const fromLat = from.lat, fromLng = from.lng;
 
   vehicleAnims[vehicleId] = setInterval(() => {
     const t = Math.min((Date.now() - startTime) / ANIM_DURATION, 1);
-    // Ease-in-out cubic
     const ease = t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2;
     marker.setLatLng([fromLat + (newLat - fromLat) * ease,
                       fromLng + (newLng - fromLng) * ease]);
@@ -2837,9 +2848,9 @@ async function sendSimUpdates(vehicleIds) {
       newLng = route.targetLng;
       newStatus = "on_scene";
     } else {
-      // Moving along the route with slight jitter for realism
-      newLat = sLat + (route.targetLat - sLat) * progress + (Math.random() - 0.5) * 0.0002;
-      newLng = sLng + (route.targetLng - sLng) * progress + (Math.random() - 0.5) * 0.0002;
+      // Move cleanly along straight line — no jitter so direction is clearly visible
+      newLat = sLat + (route.targetLat - sLat) * progress;
+      newLng = sLng + (route.targetLng - sLng) * progress;
       newStatus = route.inProgress ? "in_progress" : "dispatched";
 
       // 2% into journey → flip to "in progress"
@@ -2954,7 +2965,8 @@ async function loadIncidentsOverlay() {
               // Use the vehicle the backend actually assigned
               const pos = vehiclePositions[vid] || { lat, lng };
               const dist = haversineKm(pos.lat, pos.lng, lat, lng);
-              const travelMs = Math.max(15000, Math.min(600000, dist * 1500));
+              // Display travel time capped at 30 s so movement is clearly visible on map
+              const travelMs = Math.max(8000, Math.min(30000, dist * 300));
               dispatchRoutes[vid] = {
                 incidentId: inc._id, targetLat: lat, targetLng: lng,
                 startLat: pos.lat, startLng: pos.lng,
@@ -3025,7 +3037,7 @@ function assignNearestVehicle(inc, incLat, incLng) {
 
   const startPos = vehiclePositions[bestId] || { lat: incLat, lng: incLng };
   // Travel time: 1500 ms per km — nearby fast, cross-country up to 10 min
-  const travelMs = Math.max(15000, Math.min(600000, bestDist * 1500));
+  const travelMs = Math.max(8000, Math.min(30000, bestDist * 300));
 
   dispatchRoutes[bestId] = {
     incidentId:   inc._id,
