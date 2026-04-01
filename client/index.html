@@ -1590,8 +1590,8 @@ async function submitIncident() {
     const vLng = data.assigned_vehicle_lng ?? (responder ? responder.longitude : null);
     if (vLat != null && vLng != null) {
       const dist = haversineKm(parseFloat(vLat), parseFloat(vLng), data.latitude, data.longitude);
-      // 3000 ms/km: 5 km ≈ 15 s, 8 km ≈ 24 s, 40 km (Kasoa) ≈ 2 min, 100 km ≈ 5 min
-      travelMs = Math.max(5000, Math.min(45000, dist * 500));
+      const vType = responder?.type || data.incident_type || "ambulance";
+      travelMs = calcTravelMs(dist, vType, data.latitude, data.longitude);
     }
     const etaSec = Math.round(travelMs / 1000);
     const etaStr = etaSec >= 60 ? `${Math.ceil(etaSec/60)} min` : `${etaSec} sec`;
@@ -2448,6 +2448,41 @@ function haversineKm(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+// Returns a traffic multiplier based on current time of day
+function getTrafficMultiplier() {
+  const now = new Date();
+  const h = now.getHours() + now.getMinutes() / 60;
+  if (h >= 7   && h <  9.0) return 1.7;   // morning rush
+  if (h >= 12  && h < 13.0) return 1.3;   // lunch hour
+  if (h >= 17  && h < 19.5) return 1.8;   // evening rush (worst)
+  if (h >= 22  || h <  5.0) return 0.65;  // night — clear roads
+  return 1.0;
+}
+
+// Returns urban congestion factor if incident is near a major Ghanaian city
+function getUrbanFactor(lat, lng) {
+  const cities = [
+    { lat: 5.6037,  lng: -0.1870 },  // Accra
+    { lat: 6.6885,  lng: -1.6244 },  // Kumasi
+    { lat: 9.4008,  lng: -0.8393 },  // Tamale
+    { lat: 4.8961,  lng: -1.7557 },  // Takoradi
+  ];
+  for (const c of cities) {
+    if (haversineKm(lat, lng, c.lat, c.lng) < 25) return 1.3;
+  }
+  return 1.0;
+}
+
+// Realistic travel time combining distance, traffic, urban density, vehicle type, and random variance
+function calcTravelMs(distKm, vehicleType, incLat, incLng) {
+  const base    = distKm * 600;   // 600 ms per km baseline
+  const traffic = getTrafficMultiplier();
+  const urban   = getUrbanFactor(incLat, incLng);
+  const vFactor = { police: 0.85, ambulance: 0.90, fire: 1.05 }[vehicleType] || 1.0;
+  const jitter  = 0.80 + Math.random() * 0.40;  // ±20% random traffic variance
+  return Math.max(5000, Math.min(90000, base * traffic * urban * vFactor * jitter));
+}
+
 function redrawActiveRouteLines() {
   if (!trackingMap) return;
   Object.entries(dispatchRoutes).forEach(([vid, route]) => {
@@ -2965,8 +3000,7 @@ async function loadIncidentsOverlay() {
               // Use the vehicle the backend actually assigned
               const pos = vehiclePositions[vid] || { lat, lng };
               const dist = haversineKm(pos.lat, pos.lng, lat, lng);
-              // Display travel time capped at 30 s so movement is clearly visible on map
-              const travelMs = Math.max(5000, Math.min(45000, dist * 500));
+              const travelMs = calcTravelMs(dist, vehicleData[vid]?.vehicle_type, lat, lng);
               dispatchRoutes[vid] = {
                 incidentId: inc._id, targetLat: lat, targetLng: lng,
                 startLat: pos.lat, startLng: pos.lng,
@@ -3036,8 +3070,7 @@ function assignNearestVehicle(inc, incLat, incLng) {
   if (!bestId) return;
 
   const startPos = vehiclePositions[bestId] || { lat: incLat, lng: incLng };
-  // Travel time: 1500 ms per km — nearby fast, cross-country up to 10 min
-  const travelMs = Math.max(5000, Math.min(45000, bestDist * 500));
+  const travelMs = calcTravelMs(bestDist, vehicleData[bestId]?.vehicle_type, incLat, incLng);
 
   dispatchRoutes[bestId] = {
     incidentId:   inc._id,
